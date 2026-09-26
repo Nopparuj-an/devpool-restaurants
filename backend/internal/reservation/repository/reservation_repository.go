@@ -20,8 +20,8 @@ type Repository struct {
 
 func New(db *database.DB) *Repository { return &Repository{db: db} }
 
-func (r *Repository) RestaurantRules(ctx context.Context, restaurantID int64, lock bool) (booking.Restaurant, int64, error) {
-	return restaurantrepo.LoadRules(ctx, r.db.Conn(ctx), restaurantID, lock)
+func (r *Repository) RestaurantRules(ctx context.Context, restaurantID int64, lock, includeHidden bool) (booking.Restaurant, int64, error) {
+	return restaurantrepo.LoadRules(ctx, r.db.Conn(ctx), restaurantID, lock, includeHidden)
 }
 
 func (r *Repository) RestaurantOf(ctx context.Context, reservationID int64) (int64, error) {

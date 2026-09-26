@@ -48,7 +48,7 @@ func (h *Handler) Mine(c *gin.Context) error {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 	list, total, err := h.svc.List(c.Request.Context(), model.ListQuery{
-		Sort: "newest", OwnerID: auth.MustAccount(c).ID, Limit: limit, Offset: offset,
+		Sort: "newest", OwnerID: auth.MustAccount(c).ID, IncludeHidden: true, Limit: limit, Offset: offset,
 	})
 	if err != nil {
 		return err
@@ -62,7 +62,7 @@ func (h *Handler) Get(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	return h.writeDetail(c, auth.ViewerID(c), id, http.StatusOK)
+	return h.writeDetail(c, id, http.StatusOK)
 }
 
 // Create takes multipart/form-data: a "data" field with the Input JSON and
@@ -87,7 +87,7 @@ func (h *Handler) Create(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	return h.writeDetail(c, me, id, http.StatusCreated)
+	return h.writeDetail(c, id, http.StatusCreated)
 }
 
 func (h *Handler) Update(c *gin.Context) error {
@@ -103,7 +103,7 @@ func (h *Handler) Update(c *gin.Context) error {
 	if err := h.svc.Update(c.Request.Context(), me, id, in); err != nil {
 		return err
 	}
-	return h.writeDetail(c, me, id, http.StatusOK)
+	return h.writeDetail(c, id, http.StatusOK)
 }
 
 func (h *Handler) Delete(c *gin.Context) error {
@@ -118,8 +118,9 @@ func (h *Handler) Delete(c *gin.Context) error {
 	return nil
 }
 
-func (h *Handler) writeDetail(c *gin.Context, viewer, id int64, status int) error {
-	d, err := h.svc.Get(c.Request.Context(), viewer, id)
+func (h *Handler) writeDetail(c *gin.Context, id int64, status int) error {
+	viewer, admin := auth.Viewer(c)
+	d, err := h.svc.Get(c.Request.Context(), viewer, admin, id)
 	if err != nil {
 		return err
 	}

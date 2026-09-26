@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"restaurants/internal/admin"
 	"restaurants/internal/auth"
 	"restaurants/internal/platform/apperr"
 	"restaurants/internal/platform/config"
@@ -55,6 +56,7 @@ func New(pool *pgxpool.Pool, opts Options) *gin.Engine {
 	restaurant.RegisterRoutes(api, restaurant.NewModule(db, opts.Images, opts.ImageBaseURL))
 	reservation.RegisterRoutes(api, reservation.NewModule(db, opts.ImageBaseURL))
 	review.RegisterRoutes(api, review.NewModule(db))
+	admin.RegisterRoutes(api, admin.NewModule(db))
 	return r
 }
 

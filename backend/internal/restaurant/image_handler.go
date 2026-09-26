@@ -73,7 +73,7 @@ func (h *Handler) SetCover(c *gin.Context) error {
 }
 
 func (h *Handler) writeImages(c *gin.Context, me, id int64, status int) error {
-	d, err := h.svc.Get(c.Request.Context(), me, id)
+	d, err := h.svc.Get(c.Request.Context(), me, false, id)
 	if err != nil {
 		return err
 	}

@@ -17,9 +17,10 @@ import (
 // Repository is the outbound port for review data.
 type Repository interface {
 	// LockRestaurant locks the restaurant row (serializing its rating
-	// updates) and returns its owner; apperr.ErrNotFound if missing.
+	// updates) and returns its owner; apperr.ErrNotFound if missing or hidden.
 	LockRestaurant(ctx context.Context, restaurantID int64) (int64, error)
-	RestaurantExists(ctx context.Context, restaurantID int64) (bool, error)
+	// Restaurant returns the owner and whether customers can't see it (R-ADMIN-3, -4).
+	Restaurant(ctx context.Context, restaurantID int64) (owner int64, hidden bool, err error)
 	Rating(ctx context.Context, restaurantID, accountID int64) (int, error) // apperr.ErrNotFound if none
 	Insert(ctx context.Context, restaurantID, accountID int64, rating int, body string) error
 	Update(ctx context.Context, restaurantID, accountID int64, rating int, body string) error
@@ -39,8 +40,9 @@ type Service interface {
 	Upsert(ctx context.Context, me, restaurantID int64, in model.Input) (bool, error)
 	Delete(ctx context.Context, me, restaurantID int64) error
 	// List returns one page of reviews (most recently updated first) and the
-	// total; viewer is the logged-in account or 0.
-	List(ctx context.Context, viewer, restaurantID int64, limit, offset int) ([]model.Review, int, error)
+	// total; viewer is the logged-in account or 0. Hidden restaurants' reviews
+	// are only shown to the owner and admins.
+	List(ctx context.Context, viewer int64, admin bool, restaurantID int64, limit, offset int) ([]model.Review, int, error)
 	Mine(ctx context.Context, me, restaurantID int64) (model.Review, error)
 }
 
@@ -104,12 +106,12 @@ func (s *service) Delete(ctx context.Context, me, restaurantID int64) error {
 	})
 }
 
-func (s *service) List(ctx context.Context, viewer, restaurantID int64, limit, offset int) ([]model.Review, int, error) {
-	exists, err := s.repo.RestaurantExists(ctx, restaurantID)
+func (s *service) List(ctx context.Context, viewer int64, admin bool, restaurantID int64, limit, offset int) ([]model.Review, int, error) {
+	owner, hidden, err := s.repo.Restaurant(ctx, restaurantID)
 	if err != nil {
 		return nil, 0, err
 	}
-	if !exists {
+	if hidden && viewer != owner && !admin {
 		return nil, 0, apperr.ErrNotFound
 	}
 	if limit <= 0 || limit > 100 {

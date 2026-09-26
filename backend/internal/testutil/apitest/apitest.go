@@ -4,6 +4,7 @@ package apitest
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"image"
 	"image/png"
@@ -196,4 +197,20 @@ func (c *Client) CreateRestaurant(input map[string]any) int64 {
 	c.Multipart("POST", "/api/restaurants", map[string]string{"data": string(data)},
 		File{"images", "cover.png", PNG()}).Expect(http.StatusCreated).JSON(&out)
 	return out.ID
+}
+
+// MakeAdmin grants admin rights the way operators do: directly in the database.
+func (e *Env) MakeAdmin(email string) {
+	e.t.Helper()
+	if _, err := e.DB.Exec(context.Background(), `UPDATE accounts SET is_admin = true WHERE email = $1`, email); err != nil {
+		e.t.Fatal(err)
+	}
+}
+
+// Login returns a new client logged in with the seed test password.
+func (e *Env) Login(email string) *Client {
+	e.t.Helper()
+	c := e.Client()
+	c.Do("POST", "/api/auth/login", map[string]string{"email": email, "password": "password123"}).Expect(http.StatusOK)
+	return c
 }

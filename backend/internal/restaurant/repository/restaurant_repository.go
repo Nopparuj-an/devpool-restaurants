@@ -138,7 +138,8 @@ func (r *Repository) SetCover(ctx context.Context, id, imageID int64) error {
 const summarySelect = `
 	SELECT r.id, r.name, r.cuisine, r.location, r.seats,
 		CASE WHEN r.review_count > 0 THEN round(r.rating_sum::numeric / r.review_count, 1)::float8 END,
-		r.review_count, coalesce(ci.object_key, ''), a.id, a.display_name
+		r.review_count, coalesce(ci.object_key, ''), a.id, a.display_name,
+		r.banned_at IS NOT NULL, a.banned_at IS NOT NULL
 	FROM restaurants r
 	JOIN accounts a ON a.id = r.owner_id
 	LEFT JOIN restaurant_images ci ON ci.restaurant_id = r.id AND ci.is_cover`
@@ -172,6 +173,9 @@ func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summa
 	if q.OwnerID != 0 {
 		where = append(where, "r.owner_id = "+arg(q.OwnerID))
 	}
+	if !q.IncludeHidden {
+		where = append(where, Visible)
+	}
 	order := map[string]string{
 		"":              fmt.Sprintf("(r.rating_sum + %[1]d * g.c) / (r.review_count + %[1]d) DESC, r.review_count DESC, r.name", bayesianPrior),
 		"most_reviewed": "r.review_count DESC, r.name",
@@ -179,8 +183,14 @@ func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summa
 	}
 	order["top_rated"] = order[""]
 
+	// C, the mean of all reviews, only counts what customers can see.
 	sql := strings.Replace(summarySelect, "SELECT ", "SELECT count(*) OVER () AS total, ", 1) + `
-	CROSS JOIN (SELECT coalesce(avg(rating), 0)::float8 AS c FROM reviews) g`
+	CROSS JOIN (
+		SELECT coalesce(avg(rv.rating), 0)::float8 AS c FROM reviews rv
+		JOIN accounts ra ON ra.id = rv.account_id AND ra.banned_at IS NULL
+		JOIN restaurants rr ON rr.id = rv.restaurant_id AND rr.banned_at IS NULL
+		JOIN accounts ro ON ro.id = rr.owner_id AND ro.banned_at IS NULL
+	) g`
 	sql += whereSQL(where)
 	sql += "\n\tORDER BY " + order[q.Sort] + " LIMIT " + arg(q.Limit) + " OFFSET " + arg(q.Offset)
 
@@ -200,7 +210,7 @@ func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summa
 	}
 	if len(out) == 0 && q.Offset > 0 {
 		// Past the last page the window has no rows to report the total on.
-		err := r.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM restaurants r"+whereSQL(where), args[:len(args)-2]...).Scan(&total)
+		err := r.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM restaurants r JOIN accounts a ON a.id = r.owner_id"+whereSQL(where), args[:len(args)-2]...).Scan(&total)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -210,8 +220,13 @@ func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summa
 
 func summaryDest(sm *model.Summary) []any {
 	return []any{&sm.ID, &sm.Name, &sm.Cuisine, &sm.Location, &sm.Seats,
-		&sm.Rating, &sm.ReviewCount, &sm.CoverKey, &sm.Owner.ID, &sm.Owner.DisplayName}
+		&sm.Rating, &sm.ReviewCount, &sm.CoverKey, &sm.Owner.ID, &sm.Owner.DisplayName,
+		&sm.Banned, &sm.OwnerBanned}
 }
+
+// Visible is the SQL condition for restaurants customers can see: not banned,
+// and the owner isn't either (R-ADMIN-3, -4). Aliases: r = restaurant, a = owner.
+const Visible = "r.banned_at IS NULL AND a.banned_at IS NULL"
 
 func whereSQL(where []string) string {
 	if len(where) == 0 {
@@ -232,9 +247,9 @@ func (r *Repository) Get(ctx context.Context, id int64) (model.Detail, error) {
 	}
 	d.Summary = sm
 	if err := q.QueryRow(ctx, `
-		SELECT description, cancel_cutoff_minutes, max_reservation_minutes, timezone
+		SELECT description, cancel_cutoff_minutes, max_reservation_minutes, timezone, ban_reason
 		FROM restaurants WHERE id = $1`, id).
-		Scan(&d.Description, &d.CancelCutoffMinutes, &d.MaxReservationMinutes, &d.Timezone); err != nil {
+		Scan(&d.Description, &d.CancelCutoffMinutes, &d.MaxReservationMinutes, &d.Timezone, &d.BanReason); err != nil {
 		return d, err
 	}
 

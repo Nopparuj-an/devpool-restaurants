@@ -143,6 +143,10 @@ func (s *service) Login(ctx context.Context, email, password string) (model.Acco
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
 		return model.Account{}, model.ErrInvalidCredentials
 	}
+	// Checked after the password, so the ban isn't revealed to someone guessing.
+	if a.Banned {
+		return model.Account{}, model.ErrBanned
+	}
 	return a, nil
 }
 
@@ -213,7 +217,11 @@ func (s *service) LoginWithGoogle(ctx context.Context, g model.GoogleIdentity) (
 	if err != nil {
 		return model.Account{}, err
 	}
-	return s.repo.Account(ctx, id)
+	a, err := s.repo.Account(ctx, id)
+	if err == nil && a.Banned {
+		return model.Account{}, model.ErrBanned
+	}
+	return a, err
 }
 
 func googleDisplayName(name, email string) string {

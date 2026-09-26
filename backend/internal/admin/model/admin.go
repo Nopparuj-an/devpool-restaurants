@@ -1,0 +1,68 @@
+// Package model holds the admin feature's types and errors.
+package model
+
+import (
+	"time"
+
+	"restaurants/internal/platform/apperr"
+)
+
+// User is one row of the admin user list.
+type User struct {
+	ID           int64      `json:"id"`
+	Email        string     `json:"email"`
+	DisplayName  string     `json:"display_name"`
+	IsAdmin      bool       `json:"is_admin"`
+	BannedAt     *time.Time `json:"banned_at"`
+	BanReason    string     `json:"ban_reason"`
+	CreatedAt    time.Time  `json:"created_at"`
+	Restaurants  int        `json:"restaurants"`  // owned
+	Reviews      int        `json:"reviews"`      // written
+	Reservations int        `json:"reservations"` // made
+}
+
+// UserDetail is a user plus the restaurants they own.
+type UserDetail struct {
+	User
+	OwnedRestaurants []Restaurant `json:"owned_restaurants"`
+}
+
+type Owner struct {
+	ID          int64  `json:"id"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	Banned      bool   `json:"banned"`
+}
+
+// Restaurant is one row of the admin restaurant list.
+type Restaurant struct {
+	ID          int64      `json:"id"`
+	Name        string     `json:"name"`
+	Cuisine     string     `json:"cuisine"`
+	Location    string     `json:"location"`
+	Rating      *float64   `json:"rating"`
+	ReviewCount int        `json:"review_count"`
+	BannedAt    *time.Time `json:"banned_at"`
+	BanReason   string     `json:"ban_reason"`
+	CreatedAt   time.Time  `json:"created_at"`
+	Owner       Owner      `json:"owner"`
+}
+
+// ListQuery filters both admin lists.
+type ListQuery struct {
+	Q      string // users: email or name; restaurants: name, cuisine or owner email
+	Status string // "" = all, "active", "banned"
+	Limit  int
+	Offset int
+}
+
+type BanInput struct {
+	Reason string `json:"reason"` // optional, shown to the owner and other admins
+}
+
+var (
+	ErrBanSelf   = apperr.New(apperr.Conflict, "R-ADMIN-5", "you can't ban yourself")
+	ErrBanAdmin  = apperr.New(apperr.Conflict, "R-ADMIN-5", "admins can't be banned; remove their admin rights in the database first")
+	ErrBadStatus = apperr.InvalidInput("status must be active or banned")
+	ErrReason    = apperr.InvalidInput("reason must be at most 500 characters")
+)

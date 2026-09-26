@@ -8,12 +8,22 @@ HOST_ENV = set -a && . ../$(ENV_FILE) && set +a && \
 	  export DATABASE_URL="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/$$POSTGRES_DB?sslmode=disable" \
 	  S3_ENDPOINT=http://localhost:3900 COOKIE_SECURE=false
 
-.PHONY: help env up down ps logs garage-init psql api seed seed-bulk seed-bulk-remove test fmt vet app-up app-down app-logs app-seed
+.PHONY: help env up down ps logs garage-init psql admin admin-revoke api seed seed-bulk seed-bulk-remove test fmt vet app-up app-down app-logs app-seed
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n",$$1,$$2}'
 
 # DEV
+
+admin: ## Grant admin rights (R-ADMIN-1): make admin EMAIL=someone@example.com
+	@test -n "$(EMAIL)" || (echo "usage: make admin EMAIL=someone@example.com" && exit 1)
+	@echo "UPDATE accounts SET is_admin = true WHERE lower(email) = lower(:'email') RETURNING email, is_admin;" | \
+	  $(COMPOSE) exec -T postgres sh -c 'psql -U $$POSTGRES_USER -d $$POSTGRES_DB -v email="$$0"' "$(EMAIL)"
+
+admin-revoke: ## Remove admin rights: make admin-revoke EMAIL=someone@example.com
+	@test -n "$(EMAIL)" || (echo "usage: make admin-revoke EMAIL=someone@example.com" && exit 1)
+	@echo "UPDATE accounts SET is_admin = false WHERE lower(email) = lower(:'email') RETURNING email, is_admin;" | \
+	  $(COMPOSE) exec -T postgres sh -c 'psql -U $$POSTGRES_USER -d $$POSTGRES_DB -v email="$$0"' "$(EMAIL)"
 
 api: ## Run the Go API on the host (applies migrations on start)
 	cd backend && $(HOST_ENV) && go run ./cmd/api

@@ -117,12 +117,16 @@ func (s *seeder) seed() error {
 		{"bob@example.com", "Bob"},
 		{"carol@example.com", "Carol"},
 		{"dan@example.com", "Dan"},
+		{"admin@example.com", "Admin"}, // made admin below, in the database (R-ADMIN-1)
 	} {
 		acc, err := s.auth.Signup(s.ctx, a.email, password, a.name)
 		if err != nil {
 			return fmt.Errorf("signup %s: %w", a.email, err)
 		}
 		s.accounts[a.name] = acc.ID
+	}
+	if _, err := s.pool.Exec(s.ctx, `UPDATE accounts SET is_admin = true WHERE email = 'admin@example.com'`); err != nil {
+		return err
 	}
 
 	daily := func(open, close string, closedOn ...time.Weekday) []restaurantmodel.Hours {

@@ -12,6 +12,8 @@ var (
 	ErrGoogleEmailUnverified = apperr.New(apperr.Forbidden, "google_email_unverified", "your Google account's email is not verified")
 	ErrGoogleConflict        = apperr.New(apperr.Conflict, "google_conflict", "this email is linked to a different Google account")
 	ErrGoogleDisabled        = apperr.New(apperr.NotFound, "google_disabled", "Google login is not configured")
+	ErrBanned                = apperr.New(apperr.Forbidden, "account_banned", "this account has been suspended")
+	ErrAdminOnly             = apperr.New(apperr.Forbidden, "admin_only", "only admins can do this")
 
 	// ErrNoSession means the cookie is missing, unknown or expired. It is not
 	// shown to clients; the request simply continues logged out.

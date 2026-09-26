@@ -24,7 +24,8 @@ import (
 type Repository interface {
 	// RestaurantRules returns a restaurant's booking rules and owner. With
 	// lock, the restaurant row stays locked until the transaction ends.
-	RestaurantRules(ctx context.Context, restaurantID int64, lock bool) (booking.Restaurant, int64, error)
+	// Hidden restaurants are not found unless includeHidden (R-ADMIN-3, -4).
+	RestaurantRules(ctx context.Context, restaurantID int64, lock, includeHidden bool) (booking.Restaurant, int64, error)
 	RestaurantOf(ctx context.Context, reservationID int64) (int64, error) // apperr.ErrNotFound if missing
 	LockReservation(ctx context.Context, id int64) (model.Locked, error)
 	// Overlapping returns active reservations overlapping iv, except excludeID.
@@ -69,7 +70,7 @@ func (s *service) Create(ctx context.Context, me, restaurantID int64, in model.I
 	req := in.Booking()
 	var id int64
 	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		rules, _, err := s.repo.RestaurantRules(ctx, restaurantID, true)
+		rules, _, err := s.repo.RestaurantRules(ctx, restaurantID, true, false)
 		if err != nil {
 			return err
 		}
@@ -88,7 +89,7 @@ func (s *service) Create(ctx context.Context, me, restaurantID int64, in model.I
 
 func (s *service) Update(ctx context.Context, me, id int64, in model.Input) error {
 	updated := in.Booking()
-	return s.modify(ctx, me, id, func(ctx context.Context, rules booking.Restaurant, restaurantID int64, old booking.Reservation) error {
+	return s.modify(ctx, me, id, false, func(ctx context.Context, rules booking.Restaurant, restaurantID int64, old booking.Reservation) error {
 		// Exclude this reservation so its old seats aren't counted twice (R-EDIT-2).
 		others, err := s.repo.Overlapping(ctx, restaurantID, updated.Interval, id)
 		if err != nil {
@@ -102,7 +103,8 @@ func (s *service) Update(ctx context.Context, me, id int64, in model.Input) erro
 }
 
 func (s *service) Cancel(ctx context.Context, me, id int64) error {
-	return s.modify(ctx, me, id, func(ctx context.Context, rules booking.Restaurant, _ int64, old booking.Reservation) error {
+	// Bookings at a restaurant that was hidden later can still be cancelled.
+	return s.modify(ctx, me, id, true, func(ctx context.Context, rules booking.Restaurant, _ int64, old booking.Reservation) error {
 		if err := booking.CheckCancel(rules, old, s.now()); err != nil {
 			return err
 		}
@@ -113,7 +115,7 @@ func (s *service) Cancel(ctx context.Context, me, id int64) error {
 // modify runs fn with the restaurant and reservation locked, after checking
 // that me owns the reservation and it is still active. Lock order is always
 // restaurant → reservation, like Create, so two writers can't deadlock.
-func (s *service) modify(ctx context.Context, me, id int64,
+func (s *service) modify(ctx context.Context, me, id int64, includeHidden bool,
 	fn func(ctx context.Context, rules booking.Restaurant, restaurantID int64, old booking.Reservation) error,
 ) error {
 	return s.tx.WithinTx(ctx, func(ctx context.Context) error {
@@ -122,7 +124,7 @@ func (s *service) modify(ctx context.Context, me, id int64,
 		if err != nil {
 			return err
 		}
-		rules, _, err := s.repo.RestaurantRules(ctx, restaurantID, true)
+		rules, _, err := s.repo.RestaurantRules(ctx, restaurantID, true, includeHidden)
 		if err != nil {
 			return err
 		}
@@ -162,7 +164,7 @@ func (s *service) ListMine(ctx context.Context, me int64, limit, offset int) ([]
 }
 
 func (s *service) ListForOwner(ctx context.Context, me, restaurantID int64, from, to time.Time) ([]model.Reservation, error) {
-	_, owner, err := s.repo.RestaurantRules(ctx, restaurantID, false)
+	_, owner, err := s.repo.RestaurantRules(ctx, restaurantID, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -205,7 +207,7 @@ func (s *service) Availability(ctx context.Context, restaurantID int64, from, to
 	if !to.After(from) || to.Sub(from) > model.MaxAvailabilitySpan {
 		return model.Availability{}, model.ErrBadRange
 	}
-	rules, _, err := s.repo.RestaurantRules(ctx, restaurantID, false)
+	rules, _, err := s.repo.RestaurantRules(ctx, restaurantID, false, false)
 	if err != nil {
 		return model.Availability{}, err
 	}

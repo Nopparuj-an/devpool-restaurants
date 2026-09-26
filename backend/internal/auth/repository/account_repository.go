@@ -18,11 +18,12 @@ func New(db *database.DB) *Repository { return &Repository{db: db} }
 
 // accountColumns selects a model.Account; queries alias accounts as `a`.
 const accountColumns = `a.id, a.email, a.display_name, a.email_verified,
-	EXISTS (SELECT 1 FROM auth_identities i WHERE i.account_id = a.id AND i.provider = 'password')`
+	EXISTS (SELECT 1 FROM auth_identities i WHERE i.account_id = a.id AND i.provider = 'password'),
+	a.is_admin, a.banned_at IS NOT NULL`
 
 func scanAccount(row interface{ Scan(...any) error }) (model.Account, error) {
 	var a model.Account
-	err := row.Scan(&a.ID, &a.Email, &a.DisplayName, &a.EmailVerified, &a.HasPassword)
+	err := row.Scan(&a.ID, &a.Email, &a.DisplayName, &a.EmailVerified, &a.HasPassword, &a.IsAdmin, &a.Banned)
 	if database.IsNoRows(err) {
 		return a, model.ErrNotFound
 	}
@@ -51,10 +52,10 @@ func (r *Repository) PasswordHashByEmail(ctx context.Context, email string) (mod
 		hash string
 	)
 	err := r.db.Conn(ctx).QueryRow(ctx, `
-		SELECT a.id, a.email, a.display_name, a.email_verified, i.password_hash
+		SELECT a.id, a.email, a.display_name, a.email_verified, a.is_admin, a.banned_at IS NOT NULL, i.password_hash
 		FROM accounts a JOIN auth_identities i ON i.account_id = a.id AND i.provider = 'password'
 		WHERE lower(a.email) = $1`, email).
-		Scan(&a.ID, &a.Email, &a.DisplayName, &a.EmailVerified, &hash)
+		Scan(&a.ID, &a.Email, &a.DisplayName, &a.EmailVerified, &a.IsAdmin, &a.Banned, &hash)
 	if database.IsNoRows(err) {
 		return a, "", model.ErrNotFound
 	}
@@ -96,7 +97,7 @@ func (r *Repository) AccountBySession(ctx context.Context, tokenHash []byte, now
 	return scanAccount(r.db.Conn(ctx).QueryRow(ctx, `
 		SELECT `+accountColumns+`
 		FROM sessions s JOIN accounts a ON a.id = s.account_id
-		WHERE s.token_hash = $1 AND s.expires_at > $2`, tokenHash, now))
+		WHERE s.token_hash = $1 AND s.expires_at > $2 AND a.banned_at IS NULL`, tokenHash, now))
 }
 
 func (r *Repository) DeleteSession(ctx context.Context, tokenHash []byte) error {

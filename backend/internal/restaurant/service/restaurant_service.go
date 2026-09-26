@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"restaurants/internal/platform/apperr"
 	"restaurants/internal/platform/imageproc"
 	"restaurants/internal/restaurant/model"
 )
@@ -61,8 +62,9 @@ type Service interface {
 	SetCover(ctx context.Context, me, id, imageID int64) error
 	// List returns one page (limit ≤ 100, default 50) and the total number of matches.
 	List(ctx context.Context, q model.ListQuery) ([]model.Summary, int, error)
-	// Get returns one restaurant; viewer is the logged-in account ID or 0.
-	Get(ctx context.Context, viewer, id int64) (model.Detail, error)
+	// Get returns one restaurant. viewer is the logged-in account ID or 0;
+	// hidden restaurants are only shown to their owner and admins.
+	Get(ctx context.Context, viewer int64, admin bool, id int64) (model.Detail, error)
 }
 
 type service struct {
@@ -271,10 +273,17 @@ func (s *service) List(ctx context.Context, q model.ListQuery) ([]model.Summary,
 	return list, total, err
 }
 
-func (s *service) Get(ctx context.Context, viewer, id int64) (model.Detail, error) {
+func (s *service) Get(ctx context.Context, viewer int64, admin bool, id int64) (model.Detail, error) {
 	d, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return d, err
+	}
+	owner := viewer != 0 && viewer == d.Owner.ID
+	if d.Hidden() && !owner && !admin {
+		return model.Detail{}, apperr.ErrNotFound
+	}
+	if !owner && !admin {
+		d.BanReason = ""
 	}
 	d.CoverURL = s.url(d.CoverKey)
 	for i := range d.Images {

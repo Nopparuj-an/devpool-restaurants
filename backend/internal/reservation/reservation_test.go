@@ -231,7 +231,7 @@ func TestBookingWaitsForRestaurantLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx)
-	if _, _, err := restaurantrepo.LoadRules(ctx, tx, id, true); err != nil {
+	if _, _, err := restaurantrepo.LoadRules(ctx, tx, id, true, false); err != nil {
 		t.Fatal(err)
 	}
 

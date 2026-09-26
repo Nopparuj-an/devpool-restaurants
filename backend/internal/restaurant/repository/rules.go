@@ -16,20 +16,26 @@ import (
 // LoadRules reads what the booking rules need about a restaurant, plus its
 // owner. With lock, the restaurant row stays locked until the transaction
 // ends: that is the per-restaurant booking lock (ADR-0003, R-BOOK-6).
+// Hidden restaurants (R-ADMIN-3, -4) are "not found" unless includeHidden.
 // The reservation feature calls this from its own repository.
-func LoadRules(ctx context.Context, q database.Querier, id int64, lock bool) (booking.Restaurant, int64, error) {
+func LoadRules(ctx context.Context, q database.Querier, id int64, lock, includeHidden bool) (booking.Restaurant, int64, error) {
 	var (
 		r                   booking.Restaurant
 		owner               int64
 		cutoff, maxDuration int
 		tz                  string
+		hidden              bool
 	)
-	sql := `SELECT owner_id, seats, cancel_cutoff_minutes, max_reservation_minutes, timezone
-		FROM restaurants WHERE id = $1`
+	sql := `SELECT r.owner_id, r.seats, r.cancel_cutoff_minutes, r.max_reservation_minutes, r.timezone,
+			NOT (r.banned_at IS NULL AND a.banned_at IS NULL)
+		FROM restaurants r JOIN accounts a ON a.id = r.owner_id WHERE r.id = $1`
 	if lock {
-		sql += ` FOR UPDATE`
+		sql += ` FOR UPDATE OF r`
 	}
-	err := q.QueryRow(ctx, sql, id).Scan(&owner, &r.Seats, &cutoff, &maxDuration, &tz)
+	err := q.QueryRow(ctx, sql, id).Scan(&owner, &r.Seats, &cutoff, &maxDuration, &tz, &hidden)
+	if err == nil && hidden && !includeHidden {
+		return r, 0, apperr.ErrNotFound
+	}
 	if database.IsNoRows(err) {
 		return r, 0, apperr.ErrNotFound
 	}

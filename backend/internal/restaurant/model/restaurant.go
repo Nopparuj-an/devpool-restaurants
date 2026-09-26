@@ -56,7 +56,14 @@ type Summary struct {
 	CoverURL    string   `json:"cover_url"`
 	CoverKey    string   `json:"-"` // object key; the service turns it into CoverURL
 	Owner       Owner    `json:"owner"`
+	// Banned is set when an admin hid the restaurant (R-ADMIN-4). Only the
+	// owner and admins ever see hidden restaurants.
+	Banned      bool `json:"banned,omitempty"`
+	OwnerBanned bool `json:"owner_banned,omitempty"`
 }
+
+// Hidden reports whether customers can't see the restaurant (R-ADMIN-3, -4).
+func (s Summary) Hidden() bool { return s.Banned || s.OwnerBanned }
 
 type Image struct {
 	ID      int64  `json:"id"`
@@ -75,6 +82,7 @@ type Detail struct {
 	Hours                 []Hours `json:"hours"`
 	Images                []Image `json:"images"`
 	IsOwner               bool    `json:"is_owner"`
+	BanReason             string  `json:"ban_reason,omitempty"` // owner and admins only
 	// UpcomingReservations is only set for the owner, e.g. to warn before delete (R-REST-5).
 	UpcomingReservations *int `json:"upcoming_reservations,omitempty"`
 }
@@ -84,8 +92,10 @@ type ListQuery struct {
 	Q       string // name or cuisine contains, case-insensitive
 	Cuisine string // exact, case-insensitive
 	OwnerID int64  // 0 = any
-	Limit   int
-	Offset  int
+	// IncludeHidden also lists banned restaurants (the owner's own list).
+	IncludeHidden bool
+	Limit         int
+	Offset        int
 }
 
 // Upload is a validated image file from a multipart request.

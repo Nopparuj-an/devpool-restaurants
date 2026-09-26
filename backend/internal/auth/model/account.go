@@ -10,6 +10,9 @@ type Account struct {
 	DisplayName   string `json:"display_name"`
 	EmailVerified bool   `json:"email_verified"`
 	HasPassword   bool   `json:"has_password"`
+	// IsAdmin is granted in the database only (R-ADMIN-1).
+	IsAdmin bool `json:"is_admin"`
+	Banned  bool `json:"-"`
 }
 
 // GoogleIdentity is what we trust from a verified Google ID token.

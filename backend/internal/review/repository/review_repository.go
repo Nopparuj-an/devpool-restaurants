@@ -9,6 +9,7 @@ import (
 
 	"restaurants/internal/platform/apperr"
 	"restaurants/internal/platform/database"
+	restaurantrepo "restaurants/internal/restaurant/repository"
 	"restaurants/internal/review/model"
 )
 
@@ -20,17 +21,45 @@ func New(db *database.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) LockRestaurant(ctx context.Context, restaurantID int64) (int64, error) {
 	var owner int64
-	err := r.db.Conn(ctx).QueryRow(ctx, `SELECT owner_id FROM restaurants WHERE id = $1 FOR UPDATE`, restaurantID).Scan(&owner)
+	err := r.db.Conn(ctx).QueryRow(ctx, `
+		SELECT r.owner_id FROM restaurants r JOIN accounts a ON a.id = r.owner_id
+		WHERE r.id = $1 AND `+restaurantrepo.Visible+` FOR UPDATE OF r`, restaurantID).Scan(&owner)
 	if database.IsNoRows(err) {
-		return 0, apperr.ErrNotFound
+		return 0, apperr.ErrNotFound // missing or hidden (R-ADMIN-3, -4)
 	}
 	return owner, err
 }
 
-func (r *Repository) RestaurantExists(ctx context.Context, restaurantID int64) (bool, error) {
-	var exists bool
-	err := r.db.Conn(ctx).QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restaurants WHERE id = $1)`, restaurantID).Scan(&exists)
-	return exists, err
+func (r *Repository) Restaurant(ctx context.Context, restaurantID int64) (int64, bool, error) {
+	var (
+		owner  int64
+		hidden bool
+	)
+	err := r.db.Conn(ctx).QueryRow(ctx, `
+		SELECT r.owner_id, NOT (`+restaurantrepo.Visible+`)
+		FROM restaurants r JOIN accounts a ON a.id = r.owner_id WHERE r.id = $1`, restaurantID).Scan(&owner, &hidden)
+	if database.IsNoRows(err) {
+		return 0, false, apperr.ErrNotFound
+	}
+	return owner, hidden, err
+}
+
+// RecomputeRatings rebuilds rating_sum and review_count of the given
+// restaurants from the reviews that count: those by accounts that aren't
+// banned (R-ADMIN-3). Admin bans call it, so unbanning restores the exact totals.
+func RecomputeRatings(ctx context.Context, q database.Querier, restaurantIDs []int64) error {
+	_, err := q.Exec(ctx, `
+		UPDATE restaurants r SET rating_sum = s.sum, review_count = s.n
+		FROM (
+			SELECT r2.id, coalesce(sum(rv.rating), 0) AS sum, count(rv.id) AS n
+			FROM restaurants r2
+			LEFT JOIN (reviews rv JOIN accounts a ON a.id = rv.account_id AND a.banned_at IS NULL)
+				ON rv.restaurant_id = r2.id
+			WHERE r2.id = ANY($1)
+			GROUP BY r2.id
+		) s
+		WHERE s.id = r.id`, restaurantIDs)
+	return err
 }
 
 func (r *Repository) Rating(ctx context.Context, restaurantID, accountID int64) (int, error) {
@@ -84,7 +113,7 @@ const listSelect = `
 				AND v.status = 'active' AND v.ends_at <= $2
 		)
 	FROM reviews rv
-	JOIN accounts a ON a.id = rv.account_id
+	JOIN accounts a ON a.id = rv.account_id AND a.banned_at IS NULL -- banned reviewers are hidden (R-ADMIN-3)
 	JOIN restaurants r ON r.id = rv.restaurant_id`
 
 func (r *Repository) collect(ctx context.Context, sql string, args ...any) ([]model.Review, error) {

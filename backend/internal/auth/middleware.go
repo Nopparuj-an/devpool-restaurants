@@ -50,6 +50,24 @@ func RequireLogin() gin.HandlerFunc {
 	}
 }
 
+// RequireAdmin stops the request with 403 unless the account is an admin
+// (R-ADMIN-1). Use after RequireLogin.
+func RequireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !MustAccount(c).IsAdmin {
+			web.Error(c, model.ErrAdminOnly)
+			return
+		}
+		c.Next()
+	}
+}
+
+// Viewer is who is looking: account ID (0 for visitors) and whether they are an admin.
+func Viewer(c *gin.Context) (int64, bool) {
+	a, _ := CurrentAccount(c)
+	return a.ID, a.IsAdmin
+}
+
 // CurrentAccount returns the logged-in account, if any.
 func CurrentAccount(c *gin.Context) (model.Account, bool) {
 	a, ok := c.Request.Context().Value(ctxKey{}).(model.Account)
