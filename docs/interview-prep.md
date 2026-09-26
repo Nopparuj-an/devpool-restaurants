@@ -13,9 +13,9 @@ The interview checks *foundation*: can you explain your own code and why. Keep a
 | Why can A=7, B=7, C=3 fit in 10 seats? | A and B don't overlap; capacity is the **peak** concurrent pax, not the sum. Sweep line. | R-BOOK-5 |
 
 ## Next.js topics
-- Server vs Client Components: which of our pages are which, and why (list/detail = server; booking form = client).
-- Data fetching & forms: how Server Components call the Go API with the cookie; Server Actions vs client fetch for mutations.
-- Login/session: where the session lives (Postgres row, opaque HttpOnly cookie), why not localStorage/JWT.
+- Server vs Client Components: we chose a client-side app (ADR-0013). `page.tsx` files are server components that only set metadata; everything that fetches is a client component. Know what we gave up: server-rendered HTML and SEO for restaurant pages, and a spinner on first load.
+- Data fetching & forms: TanStack Query for reads (`useQuery`, `useInfiniteQuery` for "Show more", `keepPreviousData` for paging); writes are plain `fetch` calls followed by `invalidateQueries()`. Why not Server Actions: the backend is Go, so the browser talks to its API directly.
+- Login/session: where the session lives (Postgres row, opaque HttpOnly cookie), why not localStorage/JWT, and how a path-based `/api` proxy keeps the cookie first-party without CORS.
 
 ## Go topics
 - HTTP handlers & status codes: our table in architecture.md (401 vs 403 vs 404 vs 409 vs 422).

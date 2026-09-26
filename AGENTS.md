@@ -24,4 +24,4 @@ make test         # backend tests
 make app-up       # API + web in containers (web on :3000); app compose is separate from infra
 ```
 
-Frontend: `cd frontend && pnpm dev`. Next.js 16 differs from older versions; read `frontend/AGENTS.md` first. UI conventions and copy rules: `docs/design.md`; the gallery is at `/design`. Never import plain values from a `"use client"` module into server code (see docs/design.md).
+Frontend: `cd frontend && pnpm dev`. Next.js 16 differs from older versions; read `frontend/AGENTS.md` first. UI conventions and copy rules: `docs/design.md`; the gallery is at `/design`. Pages load data in the browser with TanStack Query and never fetch on the server ([ADR-0013](docs/decisions/0013-client-side-data-loading.md)). Never import plain values from a `"use client"` module into server code (see docs/design.md).

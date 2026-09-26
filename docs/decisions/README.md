@@ -16,3 +16,4 @@ One file per decision: `NNNN-short-title.md`. Each has a Status (`Proposed` | `A
 | [0010](0010-containers.md) | API/web images; app compose separate from infra | Accepted |
 | [0011](0011-gin-hexagonal-layout.md) | Gin + hexagonal per-feature layout (like cpc-be) | Accepted |
 | [0012](0012-admin-bans.md) | Admin rights in the DB; reversible bans; ratings rebuilt on ban | Accepted |
+| [0013](0013-client-side-data-loading.md) | Data loads in the browser with TanStack Query; `/api` proxied, cookie unchanged | Accepted |

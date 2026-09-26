@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import type { Account } from "@/lib/types";
@@ -11,13 +12,16 @@ const nav = [
   { href: "/me/restaurants", label: "My restaurants" },
 ];
 
-export function SiteHeader({ account, current }: { account: Account | null; current?: string }) {
+// account: undefined while it loads (the right side stays empty), null when logged out.
+export function SiteHeader({ account, current }: { account?: Account | null; current?: string }) {
   const router = useRouter();
+  const client = useQueryClient();
   const links = account?.is_admin ? [...nav, { href: "/admin", label: "Admin" }] : nav;
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    // Forget everything cached for this account; what's on screen refetches logged out.
+    client.resetQueries();
     router.push("/");
-    router.refresh(); // re-render server components logged out
   }
   return (
     <header className="border-b border-line bg-white">
@@ -61,11 +65,11 @@ export function SiteHeader({ account, current }: { account: Account | null; curr
                 </button>
               </div>
             </details>
-          ) : (
+          ) : account === null ? (
             <Link href="/login" className="font-medium text-accent hover:text-accent-hover">
               Log in
             </Link>
-          )}
+          ) : null}
         </div>
       </div>
       {/* Phone: nav moves to a second, scrollable row. */}

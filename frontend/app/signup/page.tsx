@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
-import { AuthRoute } from "../login/auth-route";
+import { AuthRoute } from "@/components/pages/pages";
 
 export const metadata: Metadata = { title: "Sign up · Restaurants" };
 
-export default function Signup({ searchParams }: PageProps<"/signup">) {
-  return <AuthRoute mode="signup" searchParams={searchParams} />;
+export default function Page() {
+  return <AuthRoute mode="signup" />;
 }

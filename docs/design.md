@@ -33,7 +33,7 @@ frontend/
   lib/use-time-zone.ts viewer timezone (R-TIME-2) without hydration mismatches
 ```
 
-Screens take data and callbacks as props and never fetch. The design registry passes mock data, and the real routes will pass API data of the same shapes. That's how the design and the app stay the same.
+Screens take data and callbacks as props and never fetch. The design registry passes mock data, and the real routes pass API data of the same shapes. That's how the design and the app stay the same.
 
 ## Behaviour worth knowing
 
@@ -63,6 +63,6 @@ UI text follows the humanizer rules: sentence case everywhere, plain words, no e
 | `/me/account` | AccountScreen | change name; change or set a password |
 | `/login`, `/signup` | AuthScreen | `?next=` (same-site paths only), `?error=` from Google |
 
-Each route is a small server component (`app/**/page.tsx`) that loads data with `lib/api-server.ts`, forwarding the session cookie. It then renders a client wrapper from `components/pages/pages.tsx`, which owns the router and API calls (`lib/api-client.ts`, through the `/api` rewrite). Pages that need a login redirect to `/login?next=…`.
+Each `app/**/page.tsx` only sets the title and renders a route component from `components/pages/pages.tsx` ([ADR-0013](decisions/0013-client-side-data-loading.md)). The route component reads the URL, loads data in the browser with TanStack Query (`lib/queries.ts` has the query keys and the shared hooks, `lib/api-client.ts` the fetch helpers, through the `/api` rewrite), and renders a screen. While data loads it shows `PageLoading`; a 404 shows `NotFoundView`; other failures show `PageError` with a retry button (`components/app/states.tsx`). After any write, `useRefresh()` invalidates the cache so what's on screen refetches. Pages that need a login send visitors to `/login?next=…` (`useRequireAccount`).
 
 **Gotcha, hit twice:** a server component can't read plain values (constants, objects) exported from a `"use client"` module. It receives a client reference instead of the value, with no error. Shared values go in plain modules like `lib/paging.ts` or `app/design/screen-list.ts`.

@@ -106,6 +106,15 @@ try {
   const email = `e2e${stamp}@example.com`;
   const kitchen = `E2E Kitchen ${stamp}`; // unique, so searches never match an older run
 
+  // Pages load their data in the browser, so these guards run client side too.
+  await step("guards while logged out", async () => {
+    await go("/me/reservations");
+    await evaluate(`await waitFor(() => location.pathname === "/login" && location.search === "?next=%2Fme%2Freservations" && text().includes("Log in"))`);
+    await go("/restaurants/999999999");
+    await evaluate(`await waitFor(() => text().includes("We couldn't find that page"))`);
+    return "login redirect keeps ?next=, missing restaurant is a 404";
+  });
+
   await step("sign up", async () => {
     await go("/signup");
     await evaluate(`fill("Name", "Eve"); fill("Email", "${email}"); fill("Password", "password123"); click("Create account", "button[type=submit]");`);
@@ -124,6 +133,14 @@ try {
   await step("change password", async () => {
     await evaluate(`fill("Current password", "password123"); fill("New password", "password456"); fill("Repeat new password", "password456");
       click("Change password", "button"); await waitFor(() => text().includes("Password changed."));`);
+  });
+
+  await step("guards for a plain account", async () => {
+    await go("/admin/users");
+    await evaluate(`await waitFor(() => text().includes("We couldn't find that page"))`);
+    await go("/me/restaurants/1/edit"); // a seeded restaurant owned by someone else
+    await evaluate(`await waitFor(() => text().includes("We couldn't find that page"))`);
+    return "admin pages and other owners' restaurants are 404";
   });
 
   let reservationId;
@@ -272,9 +289,10 @@ try {
   });
 
   await step("log in with the new password", async () => {
-    await go("/login");
+    await go("/login?next=%2Fme%2Freservations");
     await evaluate(`fill("Email", "${email}"); fill("Password", "password456"); click("Log in", "button[type=submit]");
-      await waitFor(() => location.pathname === "/" && text().includes("Eve K."));`);
+      await waitFor(() => location.pathname === "/me/reservations" && text().includes("Eve K."));`);
+    return "back to ?next=";
   });
 
   console.log(problems.length ? `\nProblems:\n${problems.join("\n")}\nScreenshots: ${SHOTS}` : "\nNo console errors or exceptions.");

@@ -9,12 +9,14 @@ Browser
   │  https://localhost  (same origin)
   ▼
 Next.js (App Router)      ── /api/*  rewrite ──▶  Go API  ──▶  PostgreSQL
-  • Server Components fetch the Go API,                  │
-    forwarding the session cookie                        └──▶  Garage (S3) — restaurant images
-  • Client Components for forms / interactive UI
+  • serves the app shell                                 │
+  • proxies /api and /images         /images/* ──▶  Garage (S3) — restaurant images
+Client app in the browser
+  • TanStack Query calls /api/* (the cookie rides along)
 ```
 
-- **Same origin:** Next.js rewrites `/api/*` to the Go service, so the browser only ever talks to one origin. The session cookie stays `SameSite=Lax; HttpOnly` with no CORS setup. *(proposed)*
+- **Client-side app ([ADR-0013](decisions/0013-client-side-data-loading.md)):** every page loads its data in the browser with TanStack Query. The Next server only serves the app shell and proxies.
+- **Same origin:** Next.js rewrites `/api/*` to the Go service, so the browser only ever talks to one origin. The session cookie stays `SameSite=Lax; HttpOnly` with no CORS setup, and JavaScript never sees it.
 - **Go API:** Gin, laid out hexagonally, one folder per feature ([backend.md](backend.md), ADR-0011). `pgx` for Postgres, embedded `goose` migrations. The rules engine is `backend/internal/booking` (pure functions, no I/O).
 - **PostgreSQL:** relational data, the transactions and row locks used for booking, and `timestamptz`.
 - **Garage:** S3-compatible object storage for images. See [ADR-0005](decisions/0005-garage-object-storage.md).

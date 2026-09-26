@@ -30,8 +30,7 @@ services:
         IMAGES_URL: http://restaurant-images.web.garage.localhost:3902
     image: restaurants-web
     restart: unless-stopped
-    environment:
-      API_URL: http://api:8080 # server-side fetches at request time
+    # Serves the app shell and proxies /api and /images; all data loads in the browser.
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
