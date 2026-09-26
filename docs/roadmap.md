@@ -4,10 +4,10 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 
 ## M0 — Foundation (26–28 Sep)
 - [ ] UI design as React components under the `/design` route: gallery + frame previews (ADR-0008): list, detail + booking, my reservations, my restaurants (CRUD), owner bookings, login
-- [ ] Ask instructors whether `design/` is acceptable instead of Claude Design/Lovable
+- [ ] Ask instructors whether the `/design` gallery is acceptable instead of Claude Design/Lovable
 - [x] `deployment/docker-compose.yml`: Postgres, Garage (+ init script), bind mounts in `deployment/data/`
 - [x] Go skeleton: config, router, migrations, error format (see [architecture](architecture.md#api-conventions))
-- [ ] Auth: password signup/login/logout, sessions, `me` endpoint
+- [x] Auth: password signup/login/logout, sessions, `me` endpoint, change password
 - [ ] Next.js skeleton: `/api` rewrite, session-aware layout
 
 ## M1 — Restaurants (29 Sep–1 Oct)

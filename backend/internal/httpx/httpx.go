@@ -7,6 +7,7 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -26,11 +27,26 @@ func NewError(status int, code, message string) *Error {
 	return &Error{status, code, message}
 }
 
+// Invalid is a 422 for input that fails validation without breaking a named rule.
+func Invalid(format string, args ...any) *Error {
+	return NewError(http.StatusUnprocessableEntity, "invalid_input", fmt.Sprintf(format, args...))
+}
+
 var (
 	ErrUnauthorized = NewError(http.StatusUnauthorized, "unauthorized", "login required")
 	ErrForbidden    = NewError(http.StatusForbidden, "forbidden", "not allowed")
 	ErrNotFound     = NewError(http.StatusNotFound, "not_found", "not found")
 )
+
+// Decode reads a JSON body (max 1 MB) into v, rejecting unknown fields.
+func Decode(w http.ResponseWriter, r *http.Request, v any) error {
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return NewError(http.StatusBadRequest, "bad_request", "invalid JSON body: "+err.Error())
+	}
+	return nil
+}
 
 // JSON writes v with the given status.
 func JSON(w http.ResponseWriter, status int, v any) {

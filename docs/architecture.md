@@ -81,6 +81,7 @@ COMMIT
 
 | Situation | Status |
 |---|---|
+| Malformed JSON / unknown fields | `400` `bad_request` |
 | Validation error (bad grid, past time, outside hours, pax < 1) | `422` with `{ "error": { "code": "R-BOOK-3", "message": "…" } }` |
 | Not logged in | `401` |
 | Logged in but not owner / not your reservation / reviewing own restaurant | `403` |

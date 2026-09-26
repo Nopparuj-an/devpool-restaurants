@@ -46,7 +46,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           server.New(pool).Routes(),
+		Handler:           server.New(pool, server.Options{CookieSecure: cfg.CookieSecure}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
