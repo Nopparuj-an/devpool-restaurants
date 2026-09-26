@@ -32,11 +32,14 @@ psql: ## Open psql in the Postgres container
 api: ## Run the Go API on the host (applies migrations on start)
 	cd backend && set -a && . ../$(ENV_FILE) && set +a && \
 	  DATABASE_URL="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/$$POSTGRES_DB?sslmode=disable" \
+	  S3_ENDPOINT=http://localhost:3900 \
 	  COOKIE_SECURE=false go run ./cmd/api
 
 test: ## Run backend tests (integration tests use throwaway DBs on the compose Postgres)
 	cd backend && set -a && . ../$(ENV_FILE) && set +a && \
 	  TEST_DATABASE_URL="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/postgres?sslmode=disable" \
+	  TEST_S3_ENDPOINT=http://localhost:3900 \
+	  TEST_IMAGE_PUBLIC_URL=http://$$S3_BUCKET.web.garage.localhost:3902 \
 	  go test ./...
 
 fmt: ## gofmt backend

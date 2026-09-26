@@ -10,10 +10,14 @@ import (
 
 	"restaurants/internal/auth"
 	"restaurants/internal/httpx"
+	"restaurants/internal/restaurant"
+	"restaurants/internal/storage"
 )
 
 type Options struct {
 	CookieSecure bool
+	Images       storage.Store
+	ImageBaseURL string // public prefix for image object keys, e.g. "/images"
 }
 
 // New returns the API handler. Every route lives under /api, which
@@ -23,6 +27,7 @@ func New(db *pgxpool.Pool, opts Options) http.Handler {
 
 	authHandler := auth.NewHandler(auth.NewService(db), opts.CookieSecure)
 	authHandler.Register(mux)
+	restaurant.NewHandler(restaurant.NewService(db, opts.Images, opts.ImageBaseURL)).Register(mux)
 
 	mux.Handle("GET /api/healthz", httpx.Handler(func(w http.ResponseWriter, r *http.Request) error {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)

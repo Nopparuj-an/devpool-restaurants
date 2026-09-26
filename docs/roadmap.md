@@ -11,10 +11,10 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 - [ ] Next.js skeleton: `/api` rewrite, session-aware layout
 
 ## M1 — Restaurants (29 Sep–1 Oct)
-- [ ] Restaurant CRUD with ownership checks (R-REST-*)
-- [ ] Opening hours per weekday incl. overnight + 24h, merge logic (R-HOURS-*)
-- [ ] Max reservation duration + cancel cutoff settings (R-REST-3, R-REST-6)
-- [ ] Image upload to Garage, cover + extras
+- [x] Restaurant CRUD with ownership checks (R-REST-*)
+- [x] Opening hours per weekday incl. overnight + 24h, merge logic (R-HOURS-*)
+- [x] Max reservation duration + cancel cutoff settings (R-REST-3, R-REST-6)
+- [x] Image upload to Garage, cover + extras (API)
 - [ ] Public list + detail pages
 
 ## M2 — Booking engine (1–4 Oct) ← most important
@@ -32,7 +32,7 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 - [ ] Google OAuth (ADR-0002) incl. password drop on link + set-new-password — after password auth is solid
 - [ ] Owner reservation table (per day/slot, full customer info — R-PRIV-2)
 - [ ] Limited Seats Left badge
-- [ ] Search/filter by name, cuisine
+- [x] Search/filter by name, cuisine (API)
 - [ ] Stretch: holidays/closures, search by free time
 - [ ] Seed data + test accounts; README (run, accounts, env vars)
 

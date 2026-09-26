@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"restaurants/internal/booking"
 )
@@ -46,6 +47,15 @@ func Decode(w http.ResponseWriter, r *http.Request, v any) error {
 		return NewError(http.StatusBadRequest, "bad_request", "invalid JSON body: "+err.Error())
 	}
 	return nil
+}
+
+// PathID parses a positive integer path value; anything else is a 404.
+func PathID(r *http.Request, name string) (int64, error) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
+	if err != nil || id <= 0 {
+		return 0, ErrNotFound
+	}
+	return id, nil
 }
 
 // JSON writes v with the given status.

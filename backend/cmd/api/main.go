@@ -15,6 +15,7 @@ import (
 	"restaurants/internal/config"
 	"restaurants/internal/db"
 	"restaurants/internal/server"
+	"restaurants/internal/storage"
 )
 
 func main() {
@@ -25,6 +26,9 @@ func main() {
 }
 
 func run() error {
+	// pgx returns timestamps in time.Local; the API speaks UTC only (R-TIME-1).
+	time.Local = time.UTC
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -45,8 +49,12 @@ func run() error {
 	slog.Info("migrations applied")
 
 	srv := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           server.New(pool, server.Options{CookieSecure: cfg.CookieSecure}),
+		Addr: cfg.HTTPAddr,
+		Handler: server.New(pool, server.Options{
+			CookieSecure: cfg.CookieSecure,
+			Images:       storage.NewS3(cfg.S3),
+			ImageBaseURL: cfg.ImageBaseURL,
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

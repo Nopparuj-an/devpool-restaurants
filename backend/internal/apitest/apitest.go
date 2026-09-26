@@ -5,7 +5,10 @@ package apitest
 import (
 	"bytes"
 	"encoding/json"
+	"image"
+	"image/png"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -14,22 +17,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"restaurants/internal/server"
+	"restaurants/internal/storage"
 	"restaurants/internal/testdb"
 )
 
 type Env struct {
-	t   *testing.T
-	DB  *pgxpool.Pool
-	URL string
+	t      *testing.T
+	DB     *pgxpool.Pool
+	URL    string
+	Images *storage.Memory
 }
 
 // New starts the API on a fresh database. Skips if no test DB is configured.
 func New(t *testing.T) *Env {
 	t.Helper()
 	db := testdb.New(t)
-	srv := httptest.NewServer(server.New(db, server.Options{}))
+	images := storage.NewMemory()
+	srv := httptest.NewServer(server.New(db, server.Options{Images: images, ImageBaseURL: "/images"}))
 	t.Cleanup(srv.Close)
-	return &Env{t: t, DB: db, URL: srv.URL}
+	return &Env{t: t, DB: db, URL: srv.URL, Images: images}
 }
 
 // Client is one browser: it keeps its own session cookie.
@@ -124,4 +130,67 @@ func (r *Response) JSON(v any) {
 	if err := json.Unmarshal(r.Body, v); err != nil {
 		r.t.Fatalf("decode %s: %v", r.Body, err)
 	}
+}
+
+// File is one multipart file part.
+type File struct {
+	Field, Name string
+	Data        []byte
+}
+
+// Multipart sends form fields and files as multipart/form-data.
+func (c *Client) Multipart(method, path string, fields map[string]string, files ...File) *Response {
+	c.env.t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	for k, v := range fields {
+		mw.WriteField(k, v)
+	}
+	for _, f := range files {
+		part, _ := mw.CreateFormFile(f.Field, f.Name)
+		part.Write(f.Data)
+	}
+	mw.Close()
+	req, err := http.NewRequest(method, path, &buf)
+	if err != nil {
+		c.env.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	return c.Send(req)
+}
+
+// PNG returns a tiny valid PNG image.
+func PNG() []byte {
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	for i := range img.Pix {
+		img.Pix[i] = 0xcc
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	return buf.Bytes()
+}
+
+// RestaurantInput is a valid restaurant open 10:00–23:00 every day in
+// Asia/Bangkok; override fields as needed.
+func RestaurantInput(name string, seats int) map[string]any {
+	hours := make([]map[string]any, 7)
+	for d := range hours {
+		hours[d] = map[string]any{"weekday": d, "open": "10:00", "close": "23:00"}
+	}
+	return map[string]any{
+		"name": name, "description": "Test restaurant", "cuisine": "Thai",
+		"location": "Bangkok", "seats": seats, "timezone": "Asia/Bangkok", "hours": hours,
+	}
+}
+
+// CreateRestaurant creates a restaurant with one image and returns its ID.
+func (c *Client) CreateRestaurant(input map[string]any) int64 {
+	c.env.t.Helper()
+	data, _ := json.Marshal(input)
+	var out struct {
+		ID int64 `json:"id"`
+	}
+	c.Multipart("POST", "/api/restaurants", map[string]string{"data": string(data)},
+		File{"images", "cover.png", PNG()}).Expect(http.StatusCreated).JSON(&out)
+	return out.ID
 }
