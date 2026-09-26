@@ -54,6 +54,7 @@ func run() error {
 			CookieSecure: cfg.CookieSecure,
 			Images:       storage.NewS3(cfg.S3),
 			ImageBaseURL: cfg.ImageBaseURL,
+			Google:       cfg.Google,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

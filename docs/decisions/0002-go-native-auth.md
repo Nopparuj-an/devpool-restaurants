@@ -20,6 +20,8 @@ Mitigation (decided 2026-09-26): **Google always takes priority.** No email conn
 
 Later Google logins to an already verified account just log in.
 
+**Implementation (2026-09-26):** `backend/internal/auth/google.go`. It uses the authorization-code flow with PKCE, `state`, and `nonce`, all held in a 10-minute HttpOnly `google_flow` cookie scoped to `/api/auth/google`. The ID token is verified with go-oidc (signature, issuer, audience, expiry, nonce). The post-login `next` is restricted to relative paths to prevent open redirects. `google_test.go` covers the pre-hijack scenario end to end. Google discovery is lazy, so the API still starts offline. Config lives in `deployment/.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), and leaving the ID empty disables Google login.
+
 ## Consequences
 - No external IdP container. Fewer moving parts in docker compose.
 - We own the security details: password hashing, the OAuth `state`/PKCE check, session expiry, and login rate limiting (nice to have).

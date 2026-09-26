@@ -34,10 +34,15 @@ func Require(next func(w http.ResponseWriter, r *http.Request, me Account) error
 type Handler struct {
 	svc          *Service
 	secureCookie bool
+	google       *google // nil when Google login is not configured
 }
 
-func NewHandler(svc *Service, secureCookie bool) *Handler {
-	return &Handler{svc: svc, secureCookie: secureCookie}
+func NewHandler(svc *Service, secureCookie bool, googleCfg GoogleConfig) *Handler {
+	h := &Handler{svc: svc, secureCookie: secureCookie}
+	if googleCfg.ClientID != "" {
+		h.google = &google{cfg: googleCfg}
+	}
+	return h
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -46,6 +51,18 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.Handle("POST /api/auth/logout", httpx.Handler(h.logout))
 	mux.Handle("GET /api/me", Require(h.me))
 	mux.Handle("PUT /api/me/password", Require(h.setPassword))
+	mux.Handle("GET /api/auth/providers", httpx.Handler(h.providers))
+	mux.Handle("GET /api/auth/google/start", httpx.Handler(h.googleStart))
+	mux.Handle("GET /api/auth/google/callback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The browser lands here from Google, so show errors on the login page, not as JSON.
+		if err := h.googleCallback(w, r); err != nil {
+			if e, ok := errors.AsType[*httpx.Error](err); ok {
+				http.Redirect(w, r, "/login?error="+e.Code, http.StatusFound)
+				return
+			}
+			httpx.WriteError(w, r, err)
+		}
+	}))
 }
 
 // Middleware attaches the session's account to the request context.

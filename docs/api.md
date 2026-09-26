@@ -11,6 +11,9 @@ The tests in `backend/internal/*/…_test.go` are the executable spec for these 
 | POST | `/auth/login` | `{email, password}` | `200` Account + cookie. `401 invalid_credentials` |
 | POST | `/auth/logout` | – | `204`, cookie cleared |
 | GET 🔒 | `/me` | – | Account `{id, email, display_name, email_verified, has_password}` |
+| GET | `/auth/providers` | – | `{password: true, google: bool}`. Hide the Google button when it's false |
+| GET | `/auth/google/start?next=/path` | – | `302` to Google. Use as a plain link, not fetch |
+| GET | `/auth/google/callback` | (from Google) | `302` to `next` with a session, or to `/login?error=<code>` |
 | PUT 🔒 | `/me/password` | `{current_password, new_password}` (current is ignored if the account has no password yet) | `204` |
 
 ## Restaurants

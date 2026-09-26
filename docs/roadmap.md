@@ -30,7 +30,7 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 - [x] Aggregate columns + Bayesian sort (ADR-0004); Highest rated / Most reviewed
 
 ## M4 — Polish & extras (7–9 Oct)
-- [ ] Google OAuth (ADR-0002) incl. password drop on link + set-new-password — after password auth is solid
+- [x] Google OAuth (ADR-0002) incl. password drop on link + set-new-password (API; needs a real client ID to try end to end)
 - [x] Owner reservation table API (full customer info — R-PRIV-2)
 - [ ] Owner reservation table page
 - [x] Limited Seats Left data in availability API (R-SEATS-1)

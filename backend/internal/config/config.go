@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"restaurants/internal/auth"
 	"restaurants/internal/storage"
 )
 
@@ -14,6 +15,8 @@ type Config struct {
 	CookieSecure bool   // COOKIE_SECURE, default true; set "false" for plain-http local dev
 	S3           storage.S3Config
 	ImageBaseURL string // IMAGE_BASE_URL, default "/images" (served by Garage's web endpoint, ADR-0005)
+	// GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URL; Google login is off without an ID.
+	Google auth.GoogleConfig
 }
 
 func Load() (Config, error) {
@@ -29,6 +32,11 @@ func Load() (Config, error) {
 			SecretAccessKey: os.Getenv("S3_SECRET_ACCESS_KEY"),
 		},
 		ImageBaseURL: getenv("IMAGE_BASE_URL", "/images"),
+		Google: auth.GoogleConfig{
+			ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+			ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+			RedirectURL:  getenv("GOOGLE_REDIRECT_URL", "http://localhost:3000/api/auth/google/callback"),
+		},
 	}
 	for name, v := range map[string]string{
 		"DATABASE_URL":         c.DatabaseURL,

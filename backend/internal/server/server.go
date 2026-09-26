@@ -18,6 +18,7 @@ import (
 
 type Options struct {
 	CookieSecure bool
+	Google       auth.GoogleConfig // Google login is disabled when ClientID is empty
 	Images       storage.Store
 	ImageBaseURL string // public prefix for image object keys, e.g. "/images"
 }
@@ -27,7 +28,7 @@ type Options struct {
 func New(db *pgxpool.Pool, opts Options) http.Handler {
 	mux := http.NewServeMux()
 
-	authHandler := auth.NewHandler(auth.NewService(db), opts.CookieSecure)
+	authHandler := auth.NewHandler(auth.NewService(db), opts.CookieSecure, opts.Google)
 	authHandler.Register(mux)
 	restaurant.NewHandler(restaurant.NewService(db, opts.Images, opts.ImageBaseURL)).Register(mux)
 	reservation.NewHandler(reservation.NewService(db, opts.ImageBaseURL)).Register(mux)
