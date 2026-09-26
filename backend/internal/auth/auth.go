@@ -75,7 +75,7 @@ func normalizeEmail(email string) (string, error) {
 
 func validatePassword(pw string) error {
 	if len(pw) < minPasswordLen || len(pw) > maxPasswordLen {
-		return httpx.Invalid("password must be %d–%d characters", minPasswordLen, maxPasswordLen)
+		return httpx.Invalid("password must be %d to %d characters", minPasswordLen, maxPasswordLen)
 	}
 	return nil
 }
@@ -91,7 +91,7 @@ func (s *Service) Signup(ctx context.Context, email, password, displayName strin
 	}
 	displayName = strings.TrimSpace(displayName)
 	if displayName == "" || len(displayName) > 80 {
-		return Account{}, httpx.Invalid("display name must be 1–80 characters")
+		return Account{}, httpx.Invalid("display name must be 1 to 80 characters")
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {

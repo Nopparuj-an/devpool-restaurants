@@ -6,7 +6,7 @@
 The brief marks the UI design tool as **mandatory**: "บังคับ · UI Design — Claude Design หรือ Lovable". Deliverable #3 is "a link or screenshots of the designed screens". We don't want to depend on a proprietary design tool.
 
 ## Decision
-- Designs are plain React components with mock data, served by the Next.js app itself under a **`/design` route**: a **component gallery** plus **frame previews** of each screen at phone and desktop sizes. There is no separate app, and the design route uses the exact components the real pages use. (Exact look to be decided after gathering inspiration.)
+- Designs are plain React components with mock data, served by the Next.js app itself under a **`/design` route**: a **component gallery** plus **frame previews** of each screen at phone and desktop sizes. There is no separate app, and the design route uses the exact components the real pages use. Look and structure are described in [design.md](../design.md): minimal, white, black text, PEA purple accent.
 - They are built **before** the matching Next.js pages, and the real pages reuse the same components. The design and the implementation can't drift apart.
 - Deliverable #3 is submitted as screenshots of the gallery plus a link to `design/` in the repo.
 

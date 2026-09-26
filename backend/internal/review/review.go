@@ -58,7 +58,7 @@ func (s *Service) Upsert(ctx context.Context, me, restaurantID int64, in Input) 
 		return false, httpx.NewError(422, "R-REVIEW-1", "rating must be a whole number from 1 to 5")
 	}
 	if n := utf8.RuneCountInString(body); n < 1 || n > 2000 {
-		return false, httpx.NewError(422, "R-REVIEW-1", "review text must be 1–2000 characters")
+		return false, httpx.NewError(422, "R-REVIEW-1", "review text must be 1 to 2000 characters")
 	}
 
 	var created bool

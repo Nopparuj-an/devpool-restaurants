@@ -12,6 +12,7 @@ This wiki is the source of truth for humans and coding agents. If the code and t
 | [domain.md](domain.md) | Glossary and **business rules** (booking, cancel, reviews, hours) |
 | [architecture.md](architecture.md) | Stack, components, auth flow, data model, API conventions |
 | [api.md](api.md) | Endpoint reference |
+| [design.md](design.md) | Design tokens, component layout, copy rules; live at `/design` |
 | [decisions/](decisions/) | Architecture Decision Records (why things are the way they are) |
 | [roadmap.md](roadmap.md) | Milestones and progress checklist |
 | [open-questions.md](open-questions.md) | Things not decided yet |

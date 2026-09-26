@@ -100,11 +100,11 @@ func validate(in Input, creating bool) (validated, error) {
 		{"location", v.Location, 200},
 	} {
 		if n := utf8.RuneCountInString(f.value); n < 1 || n > f.max {
-			return v, httpx.Invalid("%s must be 1–%d characters", f.name, f.max)
+			return v, httpx.Invalid("%s must be 1 to %d characters", f.name, f.max)
 		}
 	}
 	if in.Seats < 1 || in.Seats > 1000 {
-		return v, httpx.Invalid("seats must be 1–1000")
+		return v, httpx.Invalid("seats must be 1 to 1000")
 	}
 	if in.CancelCutoffMinutes != nil {
 		v.cutoff = *in.CancelCutoffMinutes
@@ -130,7 +130,7 @@ func validate(in Input, creating bool) (validated, error) {
 	seen := map[int]bool{}
 	for _, h := range in.Hours {
 		if h.Weekday < 0 || h.Weekday > 6 || seen[h.Weekday] {
-			return v, httpx.NewError(422, "R-HOURS-1", "hours need at most one shift per weekday 0–6")
+			return v, httpx.NewError(422, "R-HOURS-1", "hours need at most one shift per weekday (0 to 6)")
 		}
 		seen[h.Weekday] = true
 		open, err1 := booking.ParseClock(h.Open)

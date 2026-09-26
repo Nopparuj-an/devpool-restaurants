@@ -123,7 +123,7 @@ func (s *seeder) seed() error {
 	specs := []spec{
 		{"Somchai", restaurant.Input{
 			Name: "ครัวริมคลอง", Cuisine: "Thai", Location: "Khlong Bang Luang, Bangkok", Seats: 10,
-			Description: "Canal-side Thai home cooking. Small room, big flavours — book ahead for lunch.",
+			Description: "Thai home cooking by the canal. The room is small, so book ahead for lunch.",
 			Hours:       daily("11:00", "22:00", time.Monday),
 		}, 25},
 		{"Somchai", restaurant.Input{
