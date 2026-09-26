@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"restaurants/internal/apitest"
-	"restaurants/internal/restaurant"
+	restaurantrepo "restaurants/internal/restaurant/repository"
+	"restaurants/internal/testutil/apitest"
 )
 
 var bkk, _ = time.LoadLocation("Asia/Bangkok")
@@ -231,7 +231,7 @@ func TestBookingWaitsForRestaurantLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(ctx)
-	if _, _, err := restaurant.LockForBooking(ctx, tx, id); err != nil {
+	if _, _, err := restaurantrepo.LoadRules(ctx, tx, id, true); err != nil {
 		t.Fatal(err)
 	}
 

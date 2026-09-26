@@ -13,10 +13,12 @@ import (
 	"time"
 	_ "time/tzdata" // embed tz database so LoadLocation works in slim images (ADR-0007)
 
-	"restaurants/internal/config"
-	"restaurants/internal/db"
+	"github.com/gin-gonic/gin"
+
+	"restaurants/internal/platform/config"
+	"restaurants/internal/platform/database"
+	"restaurants/internal/platform/storage"
 	"restaurants/internal/server"
-	"restaurants/internal/storage"
 )
 
 func main() {
@@ -53,6 +55,9 @@ func healthcheck() int {
 func run() error {
 	// pgx returns timestamps in time.Local; the API speaks UTC only (R-TIME-1).
 	time.Local = time.UTC
+	if os.Getenv(gin.EnvGinMode) == "" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -62,13 +67,13 @@ func run() error {
 		return err
 	}
 
-	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	pool, err := database.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
-	if err := db.Migrate(ctx, pool); err != nil {
+	if err := database.Migrate(ctx, pool); err != nil {
 		return err
 	}
 	slog.Info("migrations applied")

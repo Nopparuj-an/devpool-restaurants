@@ -23,5 +23,10 @@ The interview checks *foundation*: can you explain your own code and why. Keep a
 - Time & timezone: `timestamptz`, `time.LoadLocation`, `time/tzdata`, half-open intervals.
 - SQL & transactions: isolation level we run at (READ COMMITTED) and why the row lock makes it safe; what happens on rollback.
 
+## Architecture questions
+- **Why interfaces for repositories?** The service says what it needs (the port). The SQL is swappable and the rules don't depend on Postgres. Each feature's `Repository` interface doubles as a list of every query that feature runs.
+- **Where does the transaction start?** In the service (`WithinTx`). Repositories only join it through the context. The booking lock needs the lock, the overlap read, and the insert in one transaction, and only the service knows that.
+- **Why no DI container?** Four modules wired in `server.New` fit on one screen (ADR-0011).
+
 ## Justify our choices
 - Postgres (transactions, row locks, `timestamptz`, constraints) · Go-native auth over Keycloak (ADR-0002) · Garage over MinIO/disk (ADR-0005) · 15-min grid (ADR-0001).

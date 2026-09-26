@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"restaurants/internal/apitest"
+	"restaurants/internal/testutil/apitest"
 )
 
 type summary struct {

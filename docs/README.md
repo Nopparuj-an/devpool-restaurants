@@ -12,6 +12,7 @@ This wiki is the source of truth for humans and coding agents. If the code and t
 | [domain.md](domain.md) | Glossary and **business rules** (booking, cancel, reviews, hours) |
 | [architecture.md](architecture.md) | Stack, components, auth flow, data model, API conventions |
 | [api.md](api.md) | Endpoint reference |
+| [backend.md](backend.md) | **Backend map**: folder layout, request flow, where to change what, rule → code |
 | [design.md](design.md) | Design tokens, component layout, copy rules; live at `/design` |
 | [decisions/](decisions/) | Architecture Decision Records (why things are the way they are) |
 | [roadmap.md](roadmap.md) | Milestones and progress checklist |
@@ -21,7 +22,7 @@ This wiki is the source of truth for humans and coding agents. If the code and t
 ## Repo layout
 
 ```
-backend/     Go API (booking rules in internal/booking)
+backend/     Go API: Gin, hexagonal per feature (see backend.md)
 frontend/    Next.js app (incl. /design gallery, ADR-0008)
 deployment/  compose files (infra + app, ADR-0010), Garage config, .env, bind-mounted data/
 docs/        this wiki

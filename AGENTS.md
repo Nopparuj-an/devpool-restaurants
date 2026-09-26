@@ -6,6 +6,7 @@ Restaurant reservation + review app (PEA DevPool 2026 final exam). Next.js front
 
 - Business rules: `docs/domain.md`. Every rule has an ID (`R-BOOK-5`) that is reused in code comments, tests, and API error codes.
 - Rules are enforced in Go (`backend/internal/booking` is pure logic, with no I/O). The frontend may check them again but is never the only guard.
+- Backend layout: **`docs/backend.md`**. Each feature is `routes.go → handler.go → service/ (rules, ports) → repository/ (SQL)`. Keep Gin out of services and SQL out of services.
 - Missing or unclear rule → add it to `docs/open-questions.md` and ask. Don't decide product behavior silently.
 - Decisions that constrain future work → new ADR in `docs/decisions/`.
 

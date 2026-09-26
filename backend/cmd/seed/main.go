@@ -20,12 +20,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"restaurants/internal/auth"
-	"restaurants/internal/config"
-	"restaurants/internal/db"
+	authservice "restaurants/internal/auth/service"
+	"restaurants/internal/platform/config"
+	"restaurants/internal/platform/database"
+	"restaurants/internal/platform/storage"
 	"restaurants/internal/reservation"
+	reservationmodel "restaurants/internal/reservation/model"
+	reservationservice "restaurants/internal/reservation/service"
 	"restaurants/internal/restaurant"
+	restaurantmodel "restaurants/internal/restaurant/model"
+	restaurantservice "restaurants/internal/restaurant/service"
 	"restaurants/internal/review"
-	"restaurants/internal/storage"
+	reviewmodel "restaurants/internal/review/model"
+	reviewservice "restaurants/internal/review/service"
 )
 
 const password = "password123"
@@ -42,10 +49,10 @@ func main() {
 type seeder struct {
 	ctx          context.Context
 	pool         *pgxpool.Pool
-	auth         *auth.Service
-	restaurants  *restaurant.Service
-	reservations *reservation.Service
-	reviews      *review.Service
+	auth         authservice.Service
+	restaurants  restaurantservice.Service
+	reservations reservationservice.Service
+	reviews      reviewservice.Service
 	accounts     map[string]int64
 }
 
@@ -56,12 +63,12 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	pool, err := database.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
-	if err := db.Migrate(ctx, pool); err != nil {
+	if err := database.Migrate(ctx, pool); err != nil {
 		return err
 	}
 
@@ -74,13 +81,14 @@ func run() error {
 		return nil
 	}
 
+	db := database.New(pool)
 	s := &seeder{
 		ctx:          ctx,
 		pool:         pool,
-		auth:         auth.NewService(pool),
-		restaurants:  restaurant.NewService(pool, storage.NewS3(cfg.S3), cfg.ImageBaseURL),
-		reservations: reservation.NewService(pool, cfg.ImageBaseURL),
-		reviews:      review.NewService(pool),
+		auth:         auth.NewService(db),
+		restaurants:  restaurant.NewService(db, storage.NewS3(cfg.S3), cfg.ImageBaseURL),
+		reservations: reservation.NewService(db, cfg.ImageBaseURL),
+		reviews:      review.NewService(db),
 		accounts:     map[string]int64{},
 	}
 	return s.seed()
@@ -102,8 +110,8 @@ func (s *seeder) seed() error {
 		s.accounts[a.name] = acc.ID
 	}
 
-	daily := func(open, close string, closedOn ...time.Weekday) []restaurant.Hours {
-		var h []restaurant.Hours
+	daily := func(open, close string, closedOn ...time.Weekday) []restaurantmodel.Hours {
+		var h []restaurantmodel.Hours
 	days:
 		for d := time.Sunday; d <= time.Saturday; d++ {
 			for _, c := range closedOn {
@@ -111,38 +119,38 @@ func (s *seeder) seed() error {
 					continue days
 				}
 			}
-			h = append(h, restaurant.Hours{Weekday: int(d), Open: open, Close: close})
+			h = append(h, restaurantmodel.Hours{Weekday: int(d), Open: open, Close: close})
 		}
 		return h
 	}
 	type spec struct {
 		owner string
-		in    restaurant.Input
+		in    restaurantmodel.Input
 		hue   float64
 	}
 	specs := []spec{
-		{"Somchai", restaurant.Input{
+		{"Somchai", restaurantmodel.Input{
 			Name: "ครัวริมคลอง", Cuisine: "Thai", Location: "Khlong Bang Luang, Bangkok", Seats: 10,
 			Description: "Thai home cooking by the canal. The room is small, so book ahead for lunch.",
 			Hours:       daily("11:00", "22:00", time.Monday),
 		}, 25},
-		{"Somchai", restaurant.Input{
+		{"Somchai", restaurantmodel.Input{
 			Name: "ส้มตำหน้าตลาด", Cuisine: "Isan", Location: "Talad Noi, Bangkok", Seats: 24,
 			Description: "Market-front som tam, grilled chicken and sticky rice.",
 			Hours:       daily("10:00", "21:00"),
 		}, 95},
-		{"Somchai", restaurant.Input{
+		{"Somchai", restaurantmodel.Input{
 			Name: "ก๋วยเตี๋ยวเรือหน้าวัด", Cuisine: "Noodles", Location: "Victory Monument, Bangkok", Seats: 16,
 			Description: "Boat noodles in small bowls, the way they were served from the canals.",
 			Hours:       daily("09:00", "16:00"),
 		}, 10},
-		{"Malee", restaurant.Input{
+		{"Malee", restaurantmodel.Input{
 			Name: "Midnight Moo Kra Ta", Cuisine: "BBQ", Location: "Ratchada, Bangkok", Seats: 30,
 			Description:         "Thai barbecue hotpot that opens at dusk and runs past midnight.",
 			Hours:               daily("18:00", "02:00"),
 			CancelCutoffMinutes: ptr(120),
 		}, 340},
-		{"Malee", restaurant.Input{
+		{"Malee", restaurantmodel.Input{
 			Name: "Sabai 24h Café", Cuisine: "Café", Location: "Ari, Bangkok", Seats: 12,
 			Description:           "Coffee, toast and khao tom around the clock.",
 			Hours:                 daily("00:00", "00:00"),
@@ -152,7 +160,7 @@ func (s *seeder) seed() error {
 	ids := map[string]int64{}
 	for i, sp := range specs {
 		sp.in.Timezone = "Asia/Bangkok"
-		uploads := []restaurant.Upload{
+		uploads := []restaurantmodel.Upload{
 			{Data: art(sp.hue, i*3), ContentType: "image/png", Ext: ".png"},
 			{Data: art(sp.hue+30, i*3+1), ContentType: "image/png", Ext: ".png"},
 			{Data: art(sp.hue-30, i*3+2), ContentType: "image/png", Ext: ".png"},
@@ -185,7 +193,7 @@ func (s *seeder) seed() error {
 		{"Malee", klong, 2, at(nextDay(5, time.Monday), "19:00"), at(nextDay(5, time.Monday), "20:30")},
 		{"Somchai", mookrata, 4, at(nextDay(4), "19:00"), at(nextDay(4), "21:00")},
 	} {
-		if _, err := s.reservations.Create(s.ctx, s.accounts[r.who], r.restaurant, reservation.Input{
+		if _, err := s.reservations.Create(s.ctx, s.accounts[r.who], r.restaurant, reservationmodel.Input{
 			Pax: r.pax, StartsAt: r.from, EndsAt: r.to,
 		}); err != nil {
 			return fmt.Errorf("reserve for %s: %w", r.who, err)
@@ -229,7 +237,7 @@ func (s *seeder) seed() error {
 		{"Bob", cafe, 5, "Only place open at 3 a.m. with decent coffee."},
 		{"Dan", mookrata, 3, "Fun night out, the grill smoke gets everywhere."},
 	} {
-		if _, err := s.reviews.Upsert(s.ctx, s.accounts[r.who], r.restaurant, review.Input{Rating: r.rating, Body: r.body}); err != nil {
+		if _, err := s.reviews.Upsert(s.ctx, s.accounts[r.who], r.restaurant, reviewmodel.Input{Rating: r.rating, Body: r.body}); err != nil {
 			return fmt.Errorf("review by %s: %w", r.who, err)
 		}
 	}

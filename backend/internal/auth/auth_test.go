@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"restaurants/internal/apitest"
+	"restaurants/internal/testutil/apitest"
 )
 
 func TestSignupLoginLogout(t *testing.T) {
