@@ -1,7 +1,7 @@
 info:
-  name: admin
+  name: profiles
   type: folder
-  seq: 9
+  seq: 8
 
 request:
   auth: inherit

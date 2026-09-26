@@ -1,0 +1,20 @@
+info:
+  name: "/auth/impersonate/stop"
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{base_url}}/auth/impersonate/stop"
+  auth: inherit
+
+docs:
+  content: |-
+    Ends the impersonation and logs the admin back in. 409 not_impersonating otherwise.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

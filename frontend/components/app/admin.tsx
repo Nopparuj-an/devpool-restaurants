@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, Segmented } from "@/components/ui/controls";
-import { Input, Textarea } from "@/components/ui/field";
-import { Badge, Rating } from "@/components/ui/misc";
+import { Field, Input, Textarea } from "@/components/ui/field";
+import { Badge, Notice, Rating } from "@/components/ui/misc";
 import * as fmt from "@/lib/format";
 import type { AdminRestaurant, AdminStatus, AdminUser } from "@/lib/types";
 import { useTimeZone } from "@/lib/use-time-zone";
@@ -121,6 +121,36 @@ export function BanDialog({
         <p>Everything comes back as it was{target.kind === "user" ? ", including their reviews in ratings" : ""}.</p>
       )}
     </ConfirmDialog>
+  );
+}
+
+// An admin renames a user (R-ADMIN-6). The email is the login and can't change.
+export function NameForm({ name: current, onSave }: { name: string; onSave: (name: string) => Promise<{ error?: string }> }) {
+  const [name, setName] = useState(current);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const changed = name.trim() !== current && name.trim() !== "";
+  return (
+    <form
+      className="flex max-w-md flex-col gap-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        const res = await onSave(name.trim());
+        setBusy(false);
+        setError(res.error);
+      }}
+    >
+      <Field label="Display name" hint="Shown on their reviews and profile.">
+        <div className="flex gap-2">
+          <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />
+          <Button type="submit" variant="secondary" disabled={!changed || busy}>
+            {busy ? "Saving…" : "Rename"}
+          </Button>
+        </div>
+      </Field>
+      {error && <Notice tone="danger">{error}</Notice>}
+    </form>
   );
 }
 

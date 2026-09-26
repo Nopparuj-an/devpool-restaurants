@@ -51,7 +51,9 @@ backend/
       routes.go  handler.go  module.go  model/ service/ repository/
     review/                  ratings and reviews (R-REVIEW-*); repository has RecomputeRatings
       routes.go  handler.go  module.go  model/ service/ repository/
-    admin/                   moderation: users, restaurants, reversible bans (R-ADMIN-*)
+    admin/                   moderation: users, restaurants, reversible bans, renaming users (R-ADMIN-*)
+      routes.go  handler.go  module.go  model/ service/ repository/
+    profile/                 public profiles: name, counts, reviews (R-PROFILE-*)
       routes.go  handler.go  module.go  model/ service/ repository/
     platform/                shared plumbing, no business rules
       apperr/                errors with a Kind (NotFound, Conflict, …), no HTTP
@@ -117,6 +119,9 @@ backend/
 | `GET /restaurants/:id/reviews`, `GET`, `PUT`, `DELETE …/reviews/me` | `review/handler.go` | `review` `List`, `Mine`, `Upsert`, `Delete` |
 | `GET /admin/users[/:id]`, `POST …/ban`, `…/unban` | `admin/handler.go` | `admin` `ListUsers`, `GetUser`, `BanUser`, `UnbanUser` |
 | `GET /admin/restaurants`, `POST …/ban`, `…/unban` | `admin/handler.go` | `admin` `ListRestaurants`, `BanRestaurant`, `UnbanRestaurant` |
+| `PUT /admin/users/:id` | `admin/handler.go` `UpdateUser` | `admin` `UpdateUser` |
+| `POST /admin/users/:id/impersonate`, `POST /auth/impersonate/stop` | `auth/handler.go` `Impersonate`, `StopImpersonating` (registered in `auth/routes.go`: they swap the cookie) | `auth` `Impersonate`, `StopImpersonating` |
+| `GET /users/:id`, `GET /users/:id/reviews` | `profile/handler.go` `Get`, `Reviews` | `profile` `Get`, `Reviews` |
 
 Request and response shapes are in [api.md](api.md).
 
@@ -136,6 +141,9 @@ Request and response shapes are in [api.md](api.md).
 | R-ADMIN-3 | `admin/service` `BanUser`, `auth` login (ErrBanned), `auth/repository` session query, `review/repository` `RecomputeRatings` |
 | R-ADMIN-4 | `restaurant/repository` `Visible` (lists, C), `restaurant/service` `Get`, `restaurant/repository/rules.go` `LoadRules(includeHidden)` |
 | R-ADMIN-5 | `admin/service` (guards, unban) |
+| R-ADMIN-6 | `restaurant/service` `lockOwned` (`model.Actor`), `reservation/service` `ListForOwner`, `admin/service` `UpdateUser` |
+| R-ADMIN-7 | `auth/service` `Impersonate`, `StopImpersonating`; `auth/repository` `AccountBySession` (drops the session when the admin loses rights); `auth/handler.go` `SetPassword` guard |
+| R-PROFILE-* | `profile/service` (who sees what), `profile/repository` (`visibleReview`) |
 | R-TIME-* | `cmd/api/main.go` (UTC), `platform/database` (session timezone) |
 
 ## Conventions

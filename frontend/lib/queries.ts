@@ -46,6 +46,9 @@ export const keys = {
   adminUsers: (params: string) => ["admin", "users", params] as const,
   adminUser: (id: number) => ["admin", "user", id] as const,
   adminRestaurants: (params: string) => ["admin", "restaurants", params] as const,
+  profile: (id: number) => ["user", id] as const,
+  profileRestaurants: (id: number) => ["user", id, "restaurants"] as const,
+  profileReviews: (id: number) => ["user", id, "reviews"] as const,
 };
 
 // The logged-in account: undefined while loading, null when logged out.

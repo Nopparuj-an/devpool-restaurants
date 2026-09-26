@@ -1,0 +1,26 @@
+info:
+  name: "/admin/users/:id (update)"
+  type: http
+  seq: 9
+
+http:
+  method: PUT
+  url: "{{base_url}}/admin/users/{{user_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "display_name": "Alice"
+      }
+  auth: inherit
+
+docs:
+  content: |-
+    Admins only. Renames the user (R-ADMIN-6); the email can't change.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

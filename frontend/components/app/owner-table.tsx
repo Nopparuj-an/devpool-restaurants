@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/misc";
 import * as fmt from "@/lib/format";
 import type { Reservation } from "@/lib/types";
@@ -79,7 +81,13 @@ export function OwnerTable({ reservations }: { reservations: Reservation[] }) {
             <tr key={r.id} className="border-b border-line last:border-0">
               <td className="px-4 py-3 tabular-nums">{fmt.timeRange(r.starts_at, r.ends_at, tz)}</td>
               <td className="px-4 py-3 tabular-nums">{r.pax}</td>
-              <td className="px-4 py-3 font-medium">{r.customer?.display_name}</td>
+              <td className="px-4 py-3 font-medium">
+                {r.customer && (
+                  <Link href={`/users/${r.customer.id}`} className="hover:text-accent">
+                    {r.customer.display_name}
+                  </Link>
+                )}
+              </td>
               <td className="px-4 py-3 text-muted">{r.customer?.email}</td>
               <td className="px-4 py-3">
                 {r.status === "cancelled" ? <Badge>Cancelled</Badge> : <Badge tone="accent">Booked</Badge>}

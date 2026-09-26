@@ -11,6 +11,11 @@ export function reviewCount(n: number): string {
   return n === 1 ? "1 review" : `${n} reviews`;
 }
 
+// "1 restaurant", "1,204 reviews".
+export function count(n: number, noun: string): string {
+  return n === 1 ? `1 ${noun}` : `${n.toLocaleString("en")} ${noun}s`;
+}
+
 export function guests(n: number): string {
   return n === 1 ? "1 guest" : `${n} guests`;
 }

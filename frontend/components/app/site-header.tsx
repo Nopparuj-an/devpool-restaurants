@@ -17,6 +17,12 @@ export function SiteHeader({ account, current }: { account?: Account | null; cur
   const router = useRouter();
   const client = useQueryClient();
   const links = account?.is_admin ? [...nav, { href: "/admin", label: "Admin" }] : nav;
+  // Back to the admin's own session (R-ADMIN-7).
+  async function stopImpersonating() {
+    const res = await fetch("/api/auth/impersonate/stop", { method: "POST" }).catch(() => null);
+    client.resetQueries();
+    router.push(res?.ok && account ? `/admin/users/${account.id}` : "/");
+  }
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     // Forget everything cached for this account; what's on screen refetches logged out.
@@ -24,6 +30,19 @@ export function SiteHeader({ account, current }: { account?: Account | null; cur
     router.push("/");
   }
   return (
+    <>
+    {account?.impersonator && (
+      <div className="bg-ink text-white">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-sm sm:px-6">
+          <span>
+            You&apos;re using the app as <span className="font-semibold">{account.display_name}</span>.
+          </span>
+          <button type="button" onClick={stopImpersonating} className="ml-auto font-medium underline underline-offset-4 hover:no-underline">
+            Back to {account.impersonator.display_name}
+          </button>
+        </div>
+      </div>
+    )}
     <header className="border-b border-line bg-white">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
@@ -53,6 +72,9 @@ export function SiteHeader({ account, current }: { account?: Account | null; cur
               </summary>
               <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-line bg-white p-1 shadow-sm">
                 <p className="truncate px-3 py-2 text-xs text-muted">{account.email}</p>
+                <Link href={`/users/${account.id}`} className="block rounded-lg px-3 py-2 text-sm hover:bg-surface">
+                  Public profile
+                </Link>
                 <Link href="/me/account" className="block rounded-lg px-3 py-2 text-sm hover:bg-surface">
                   Account settings
                 </Link>
@@ -86,6 +108,7 @@ export function SiteHeader({ account, current }: { account?: Account | null; cur
         ))}
       </nav>
     </header>
+    </>
   );
 }
 

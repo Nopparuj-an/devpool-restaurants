@@ -58,8 +58,9 @@ UI text follows the humanizer rules: sentence case everywhere, plain words, no e
 | `/restaurants/[id]` | RestaurantScreen | `?edit=<reservation>` switches the booking panel to "Change booking" |
 | `/me/reservations` | MyBookingsScreen | login required |
 | `/me/restaurants`, `/me/restaurants/new` | MyRestaurantsScreen, RestaurantEditorScreen | login required |
-| `/me/restaurants/[id]/edit`, `/bookings` | RestaurantEditorScreen, OwnerBookingsScreen | owner only, otherwise 404 |
-| `/admin/users`, `/admin/users/[id]`, `/admin/restaurants` | AdminUsersScreen, AdminUserScreen, AdminRestaurantsScreen | admins only (404 otherwise); `?q=&status=&page=` |
+| `/me/restaurants/[id]/edit`, `/bookings` | RestaurantEditorScreen, OwnerBookingsScreen | owner or admin (`can_manage`), otherwise 404 |
+| `/users/[id]` | ProfileScreen | public; names on reviews, restaurant pages and the owner table link here |
+| `/admin/users`, `/admin/users/[id]`, `/admin/restaurants` | AdminUsersScreen, AdminUserScreen, AdminRestaurantsScreen | admins only (404 otherwise); `?q=&status=&page=`. The user page renames and impersonates |
 | `/me/account` | AccountScreen | change name; change or set a password |
 | `/login`, `/signup` | AuthScreen | `?next=` (same-site paths only), `?error=` from Google |
 

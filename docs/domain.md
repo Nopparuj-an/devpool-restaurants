@@ -31,7 +31,7 @@ The Go backend enforces every rule on this page. Rule IDs (e.g. `R-BOOK-3`) are 
 ## Restaurants
 
 - **R-REST-1:** Required fields: name, description, cuisine type, location, seats (≥ 1), at least one image (one is the **cover**), opening hours.
-- **R-REST-2:** Only the owner can update or delete the restaurant. Anyone else gets `403`.
+- **R-REST-2:** Only the owner (or an admin, R-ADMIN-6) can update or delete the restaurant. Anyone else gets `403`.
 - **R-REST-3:** `cancel_cutoff_minutes` defaults to 30. It must be **≥ 30** and a multiple of 15.
 - **R-REST-4:** Changing seats, hours, cutoff, or max duration **never modifies existing reservations**. New settings apply to new bookings and to edits made afterwards.
 - **R-REST-5:** Deleting a restaurant **cascades**: its images, reservations (including future ones), and reviews are deleted. The frontend must show a confirmation that says how many upcoming reservations will be lost.
@@ -94,6 +94,12 @@ The customer picks pax, date, and times in their browser's timezone. The fronten
 
 - **R-PRIV-1:** The public and other customers see only an account's **display name** (e.g. on reviews).
 - **R-PRIV-2:** An owner sees **full customer info** (display name + email) for accounts that have interacted with their restaurant, meaning they reserved or reviewed. This is shown in the owner's reservation table and on reviews of their restaurant.
+- **R-PRIV-3:** Admins see every account's email (admin pages, a restaurant's bookings).
+
+## Profiles
+
+- **R-PROFILE-1:** Every account has a public profile at `/users/{id}`: display name, when they joined, their restaurants and their reviews, with counts. Never the email (R-PRIV-1). Names on reviews, restaurant pages and the owner's booking table link to it.
+- **R-PROFILE-2:** Hidden content follows R-ADMIN-3 and -4: the public sees only visible restaurants and reviews on visible restaurants. The profile's owner and admins see everything, marked hidden. A banned account's profile is 404 for everyone but admins.
 
 ## Admin
 
@@ -102,3 +108,5 @@ The customer picks pax, date, and times in their browser's timezone. The fronten
 - **R-ADMIN-3 (ban a user):** The account can't log in with a password or Google (403 `account_banned`), and its sessions end at once. Its restaurants are hidden (R-ADMIN-4 applies to them). Its reviews are hidden and removed from every rating they counted in: `rating_sum` and `review_count` are recomputed in the same transaction. Its bookings are left as they are.
 - **R-ADMIN-4 (hidden restaurant):** A restaurant is hidden when it is banned or its owner is. Hidden restaurants aren't listed, their page and availability return 404, and they can't be booked or reviewed. Existing bookings stay and can still be cancelled. The owner and admins can still open the page, which shows why it's hidden. Hidden restaurants and banned reviewers don't count toward the Bayesian mean C (ADR-0004).
 - **R-ADMIN-5:** Bans are reversible. Unbanning clears `banned_at` and recomputes the ratings, so everything returns exactly as it was. An admin can't ban themselves or another admin (409 `R-ADMIN-5`); remove admin rights in the database first. An optional reason (max 500 characters) is shown to the owner and to admins.
+- **R-ADMIN-6 (manage):** Admins can rename any account (not its email, which is the login) and can edit, delete and see the bookings of any restaurant, with the same rules the owner has.
+- **R-ADMIN-7 (impersonate):** An admin can use the app as another user, to see what they see and act for them. The admin's session is replaced by an impersonation session for the user that records the admin (8 hours). While it lasts the app shows a banner with a way back, the user can't change their password through it, and admin pages are closed (the session is the user's). "Back" ends it and logs the admin in again. Admins and banned users can't be impersonated (409 `R-ADMIN-7`). The session stops working as soon as the admin loses admin rights or is banned. Every start and stop is logged. See [ADR-0014](decisions/0014-admin-impersonation.md).

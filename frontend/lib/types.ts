@@ -29,6 +29,8 @@ export type RestaurantDetail = RestaurantSummary & {
   hours: Hours[];
   images: RestaurantImage[];
   is_owner: boolean;
+  // Owner or admin: may edit, delete and see bookings (R-ADMIN-6).
+  can_manage: boolean;
   upcoming_reservations?: number;
   ban_reason?: string;
 };
@@ -74,7 +76,32 @@ export type Account = {
   email_verified: boolean;
   has_password: boolean;
   is_admin: boolean;
+  // Set while an admin is acting as this account (R-ADMIN-7).
+  impersonator?: { id: number; display_name: string };
 };
+
+// Public profile (R-PROFILE-*): never the email.
+export type Profile = {
+  id: number;
+  display_name: string;
+  created_at: string;
+  restaurant_count: number;
+  review_count: number;
+  banned?: boolean; // only admins ever see a banned profile
+};
+
+export type ProfileReview = {
+  id: number;
+  rating: number;
+  body: string;
+  verified: boolean;
+  created_at: string;
+  updated_at: string;
+  restaurant: { id: number; name: string; cover_url: string };
+  hidden?: boolean; // owner and admins only
+};
+
+export type ProfileReviewPage = { reviews: ProfileReview[]; total: number };
 
 export type SortKey = "top_rated" | "most_reviewed" | "newest";
 

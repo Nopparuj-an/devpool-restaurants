@@ -29,6 +29,7 @@ import {
   MyBookingsScreen,
   MyRestaurantsScreen,
   OwnerBookingsScreen,
+  ProfileScreen,
   RestaurantEditorScreen,
   RestaurantScreen,
 } from "@/components/screens/screens";
@@ -43,6 +44,8 @@ import type {
   AdminUser,
   AdminUserDetail,
   Availability,
+  Profile,
+  ProfileReviewPage,
   Reservation,
   ReservationPage,
   RestaurantDetail,
@@ -348,8 +351,8 @@ export function MyRestaurantsRoute() {
   return <MyRestaurantsScreen account={me.data!} restaurants={list.data!.restaurants} />;
 }
 
-// Loads a restaurant for its owner. Anyone else sees a 404 (the API enforces
-// ownership on every change anyway, R-REST-2).
+// Loads a restaurant for its owner or an admin. Anyone else sees a 404 (the
+// API checks every change anyway, R-REST-2, R-ADMIN-6).
 function useOwnedRestaurant() {
   const id = useIdParam();
   const me = useRequireAccount();
@@ -359,9 +362,9 @@ function useOwnedRestaurant() {
     enabled: !!me.data,
   });
   const wait = gateLoggedIn(me, restaurant);
-  const notOwner = !wait && !restaurant.data!.is_owner;
+  const denied = !wait && !restaurant.data!.can_manage;
   return {
-    wait: notOwner ? <NotFoundView account={me.data} /> : wait,
+    wait: denied ? <NotFoundView account={me.data} /> : wait,
     account: me.data!,
     restaurant: restaurant.data!,
   };
@@ -444,7 +447,7 @@ function RestaurantEditor({ account, restaurant }: { account: Account; restauran
         restaurant
           ? async () => {
               await api("DELETE", `/restaurants/${restaurant.id}`);
-              router.push("/me/restaurants");
+              router.push(restaurant.is_owner ? "/me/restaurants" : "/admin/restaurants");
               // Nothing under ["restaurant", id] exists any more.
               client.removeQueries({ queryKey: keys.restaurant(restaurant.id) });
               refresh();
@@ -678,7 +681,84 @@ export function AdminUserRoute() {
     enabled: !!me.data?.is_admin,
   });
   const ban = useBanAction();
+  const refresh = useRefresh();
+  const client = useQueryClient();
+  const router = useRouter();
   const wait = gateAdmin(me, user);
   if (wait) return wait;
-  return <AdminUserScreen account={me.data!} user={user.data!} onBan={ban} />;
+  return (
+    <AdminUserScreen
+      account={me.data!}
+      user={user.data!}
+      onBan={ban}
+      onRename={async (display_name) => {
+        const res = await api("PUT", `/admin/users/${id}`, { display_name });
+        if (!res.error) await refresh();
+        return { error: res.error };
+      }}
+      // Swaps the session cookie for one as this user (R-ADMIN-7). Nothing
+      // cached as the admin is valid any more.
+      onImpersonate={async () => {
+        const res = await api("POST", `/admin/users/${id}/impersonate`);
+        if (res.error) return { error: res.error };
+        client.resetQueries();
+        router.push("/");
+        return {};
+      }}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Public profile
+
+const PROFILE_RESTAURANTS = 12;
+
+export function ProfileRoute() {
+  const id = useIdParam();
+  const me = useAccount();
+  const profile = useQuery({
+    queryKey: keys.profile(id),
+    queryFn: () => get<Profile>(`/users/${id}`),
+  });
+  // Their restaurants come from the normal list, filtered by owner.
+  const restaurants = useInfiniteQuery({
+    queryKey: keys.profileRestaurants(id),
+    queryFn: ({ pageParam }) =>
+      get<RestaurantPage>(`/restaurants?owner_id=${id}&sort=newest&limit=${PROFILE_RESTAURANTS}&offset=${pageParam}`),
+    initialPageParam: 0,
+    getNextPageParam: nextOffset<RestaurantPage>((p) => p.restaurants),
+  });
+  const reviews = useInfiniteQuery({
+    queryKey: keys.profileReviews(id),
+    queryFn: ({ pageParam }) => get<ProfileReviewPage>(`/users/${id}/reviews?limit=${REVIEWS_PAGE_SIZE}&offset=${pageParam}`),
+    initialPageParam: 0,
+    getNextPageParam: nextOffset<ProfileReviewPage>((p) => p.reviews),
+  });
+
+  const name = profile.data?.display_name;
+  useEffect(() => {
+    if (name) document.title = `${name} · Restaurants`;
+  }, [name]);
+
+  const wait = gate(me, profile, restaurants, reviews);
+  if (wait) return wait;
+  const rPages = restaurants.data!.pages;
+  const vPages = reviews.data!.pages;
+  return (
+    <ProfileScreen
+      account={me.data ?? null}
+      profile={profile.data!}
+      restaurants={unique(rPages.flatMap((p) => p.restaurants))}
+      restaurantsTotal={rPages[rPages.length - 1].total}
+      onMoreRestaurants={async () => {
+        await restaurants.fetchNextPage();
+      }}
+      reviews={unique(vPages.flatMap((p) => p.reviews))}
+      reviewsTotal={vPages[vPages.length - 1].total}
+      onMoreReviews={async () => {
+        await reviews.fetchNextPage();
+      }}
+    />
+  );
 }

@@ -1,0 +1,20 @@
+info:
+  name: "/admin/users/:id/impersonate"
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{base_url}}/admin/users/{{user_id}}/impersonate"
+  auth: inherit
+
+docs:
+  content: |-
+    Admins only. Replaces the session cookie with one as the user (R-ADMIN-7). Not for admins or banned users (409).
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

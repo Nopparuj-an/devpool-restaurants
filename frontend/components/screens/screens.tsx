@@ -2,7 +2,7 @@
 
 // Full screens, built only from props. The /design gallery feeds them mock
 // data; the real routes will feed them API data with the same shapes.
-import { Pencil, Plus, Search, Table2 } from "lucide-react";
+import { BadgeCheck, EyeOff, Pencil, Plus, Search, Table2, VenetianMask } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -11,6 +11,7 @@ import {
   AdminFilters,
   AdminTabs,
   BanDialog,
+  NameForm,
   RestaurantTable,
   StatusBadge,
   UserTable,
@@ -28,7 +29,7 @@ import { Page, PageTitle, SiteHeader } from "@/components/app/site-header";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ConfirmDialog, Segmented } from "@/components/ui/controls";
 import { Input } from "@/components/ui/field";
-import { Badge, EmptyState, Notice, Photo, Rating } from "@/components/ui/misc";
+import { Badge, EmptyState, Notice, Photo, Rating, Stars } from "@/components/ui/misc";
 import { Pagination, ShowMore } from "@/components/ui/pagination";
 import * as fmt from "@/lib/format";
 import type {
@@ -41,6 +42,8 @@ import type {
   Reservation,
   RestaurantDetail,
   RestaurantSummary,
+  Profile,
+  ProfileReview,
   Review,
   SortKey,
 } from "@/lib/types";
@@ -184,10 +187,20 @@ export function RestaurantScreen({
           {account?.is_admin && onAdminBan && !r.is_owner && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-4 py-3 text-sm">
               <span className="text-muted">Admin</span>
-              <span className="flex gap-2">
+              <span className="flex flex-wrap gap-2">
                 <ButtonLink size="sm" variant="secondary" href={`/admin/users/${r.owner.id}`}>
                   Owner
                 </ButtonLink>
+                {r.can_manage && (
+                  <>
+                    <ButtonLink size="sm" variant="secondary" href={`/me/restaurants/${r.id}/bookings`}>
+                      Bookings
+                    </ButtonLink>
+                    <ButtonLink size="sm" variant="secondary" href={`/me/restaurants/${r.id}/edit`}>
+                      Edit
+                    </ButtonLink>
+                  </>
+                )}
                 <Button
                   size="sm"
                   variant={r.banned ? "secondary" : "danger"}
@@ -223,6 +236,12 @@ export function RestaurantScreen({
               <h1 className="text-3xl font-semibold tracking-tight">{r.name}</h1>
               <p className="text-muted">
                 {r.cuisine} · {r.location}
+              </p>
+              <p className="text-sm text-muted">
+                Run by{" "}
+                <Link href={`/users/${r.owner.id}`} className="font-medium text-ink hover:text-accent">
+                  {r.owner.display_name}
+                </Link>
               </p>
               <Rating value={r.rating} count={r.review_count} size="lg" />
               <p className="mt-3 max-w-prose leading-relaxed">{r.description}</p>
@@ -619,12 +638,20 @@ export function AdminUserScreen({
   account,
   user,
   onBan,
+  onRename,
+  onImpersonate,
 }: {
   account: Account;
   user: AdminUserDetail;
   onBan: (target: BanTarget, reason: string) => Promise<void>;
+  onRename?: (name: string) => Result;
+  onImpersonate?: () => Result;
 }) {
   const ban = useBan(onBan);
+  const [impersonating, setImpersonating] = useState(false);
+  const [impersonateError, setImpersonateError] = useState<string>();
+  // Admins and banned users can't be impersonated (R-ADMIN-7).
+  const canImpersonate = onImpersonate && !user.is_admin && !user.banned_at && user.id !== account.id;
   const tz = useTimeZone();
   const stats = [
     ["Restaurants", user.restaurants],
@@ -642,17 +669,40 @@ export function AdminUserScreen({
           title={user.display_name}
           subtitle={`${user.email} · joined ${fmt.day(user.created_at, tz)}`}
           action={
-            !user.is_admin &&
-            user.id !== account.id && (
-              <Button
-                variant={user.banned_at ? "secondary" : "danger"}
-                onClick={() => ban.open({ kind: "user", id: user.id, name: user.display_name, banned: !!user.banned_at })}
-              >
-                {user.banned_at ? "Unban user" : "Ban user"}
-              </Button>
-            )
+            <div className="flex flex-wrap gap-2">
+              <ButtonLink variant="secondary" href={`/users/${user.id}`}>
+                Profile
+              </ButtonLink>
+              {canImpersonate && (
+                <Button
+                  variant="secondary"
+                  disabled={impersonating}
+                  onClick={async () => {
+                    setImpersonating(true);
+                    const res = await onImpersonate();
+                    setImpersonateError(res.error);
+                    if (res.error) setImpersonating(false);
+                  }}
+                >
+                  <VenetianMask className="size-4" /> {impersonating ? "Switching…" : "Log in as this user"}
+                </Button>
+              )}
+              {!user.is_admin && user.id !== account.id && (
+                <Button
+                  variant={user.banned_at ? "secondary" : "danger"}
+                  onClick={() => ban.open({ kind: "user", id: user.id, name: user.display_name, banned: !!user.banned_at })}
+                >
+                  {user.banned_at ? "Unban user" : "Ban user"}
+                </Button>
+              )}
+            </div>
           }
         />
+        {impersonateError && (
+          <div className="-mt-4 mb-6">
+            <Notice tone="danger">{impersonateError}</Notice>
+          </div>
+        )}
         <div className="mb-10 flex flex-wrap items-center gap-6">
           <StatusBadge bannedAt={user.banned_at} admin={user.is_admin} />
           {stats.map(([label, n]) => (
@@ -669,6 +719,11 @@ export function AdminUserScreen({
             </Notice>
           </div>
         )}
+        {onRename && (
+          <div className="mb-10">
+            <NameForm key={user.display_name} name={user.display_name} onSave={onRename} />
+          </div>
+        )}
         <h2 className="mb-4 font-semibold">Restaurants they own</h2>
         {user.owned_restaurants.length === 0 ? (
           <EmptyState title="No restaurants" />
@@ -676,6 +731,137 @@ export function AdminUserScreen({
           <RestaurantTable restaurants={user.owned_restaurants} onBan={ban.open} showOwner={false} />
         )}
         {ban.dialog}
+      </Page>
+    </>
+  );
+}
+
+// A public profile (R-PROFILE-1): name, when they joined, their restaurants
+// and reviews. Never the email.
+export function ProfileScreen({
+  account,
+  profile: p,
+  restaurants,
+  restaurantsTotal,
+  onMoreRestaurants,
+  reviews,
+  reviewsTotal,
+  onMoreReviews,
+}: {
+  account: Account | null;
+  profile: Profile;
+  restaurants: RestaurantSummary[];
+  restaurantsTotal: number;
+  onMoreRestaurants?: () => Promise<void>;
+  reviews: ProfileReview[];
+  reviewsTotal: number;
+  onMoreReviews?: () => Promise<void>;
+}) {
+  const tz = useTimeZone();
+  const [busy, setBusy] = useState<"restaurants" | "reviews" | null>(null);
+  async function more(which: "restaurants" | "reviews", load?: () => Promise<void>) {
+    setBusy(which);
+    await load?.();
+    setBusy(null);
+  }
+  const self = account?.id === p.id;
+  return (
+    <>
+      <SiteHeader account={account} />
+      <Page>
+        {p.banned && (
+          <div className="mb-6">
+            <Notice tone="danger">This account is banned. Only admins can see this page.</Notice>
+          </div>
+        )}
+        <div className="mb-10 flex flex-wrap items-center gap-5">
+          <span className="flex size-16 items-center justify-center rounded-full bg-accent-soft text-2xl font-semibold text-accent">
+            {p.display_name.slice(0, 1).toUpperCase()}
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight">{p.display_name}</h1>
+            <p className="text-sm text-muted">
+              Joined {fmt.day(p.created_at, tz)} · {fmt.count(p.review_count, "review")} ·{" "}
+              {fmt.count(p.restaurant_count, "restaurant")}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            {self && (
+              <ButtonLink variant="secondary" href="/me/account">
+                Edit profile
+              </ButtonLink>
+            )}
+            {account?.is_admin && !self && (
+              <ButtonLink variant="secondary" href={`/admin/users/${p.id}`}>
+                Manage
+              </ButtonLink>
+            )}
+          </div>
+        </div>
+
+        {restaurants.length > 0 && (
+          <section className="mb-12">
+            <h2 className="mb-4 font-semibold">Restaurants</h2>
+            <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+              {restaurants.map((r) => (
+                <RestaurantCard key={r.id} restaurant={r} />
+              ))}
+            </div>
+            <ShowMore
+              shown={restaurants.length}
+              total={restaurantsTotal}
+              busy={busy === "restaurants"}
+              onMore={() => more("restaurants", onMoreRestaurants)}
+            />
+          </section>
+        )}
+
+        <section>
+          <h2 className="mb-2 font-semibold">Reviews</h2>
+          {reviews.length === 0 ? (
+            <p className="text-sm text-muted">No reviews yet.</p>
+          ) : (
+            <div>
+              {reviews.map((rv) => (
+                <article key={rv.id} className="flex gap-4 border-b border-line py-5 last:border-0">
+                  <Link href={`/restaurants/${rv.restaurant.id}`} className="shrink-0">
+                    <Photo src={rv.restaurant.cover_url} className="size-14 rounded-lg" />
+                  </Link>
+                  <div className="flex min-w-0 flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <Link href={`/restaurants/${rv.restaurant.id}`} className="font-medium hover:text-accent">
+                        {rv.restaurant.name}
+                      </Link>
+                      {rv.verified && (
+                        <span className="inline-flex items-center gap-1 text-xs text-success">
+                          <BadgeCheck className="size-3.5" aria-hidden />
+                          Visited
+                        </span>
+                      )}
+                      {rv.hidden && (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted">
+                          <EyeOff className="size-3.5" aria-hidden />
+                          Restaurant hidden
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Stars value={rv.rating} />
+                      <span className="text-xs text-faint">{fmt.day(rv.updated_at, tz)}</span>
+                    </div>
+                    <p className="text-sm leading-relaxed">{rv.body}</p>
+                  </div>
+                </article>
+              ))}
+              <ShowMore
+                shown={reviews.length}
+                total={reviewsTotal}
+                busy={busy === "reviews"}
+                onMore={() => more("reviews", onMoreReviews)}
+              />
+            </div>
+          )}
+        </section>
       </Page>
     </>
   );

@@ -187,6 +187,18 @@ try {
       click("Post review", "button"); await waitFor(() => text().includes("Your review") && text().includes("Tested end to end"));`);
   });
 
+  await step("public profiles", async () => {
+    // From the restaurant page, the owner's name opens their profile with their restaurants.
+    await evaluate(`const owner = [...document.querySelectorAll('main a[href^="/users/"]')].find((a) => a.parentElement.textContent.startsWith("Run by"));
+      const name = owner.textContent.trim(); owner.click();
+      await waitFor(() => location.pathname.startsWith("/users/") && document.querySelector("h1")?.textContent === name && text().includes("ส้มตำหน้าตลาด"));`);
+    // My own profile, from the account menu, lists the review without my email.
+    await evaluate(`click("E"); click("Public profile", "a");
+      await waitFor(() => document.querySelector("h1")?.textContent === "Eve K." && text().includes("Tested end to end") && text().includes("1 review"));
+      if (document.querySelector("main").innerText.includes("${email}")) throw new Error("profile shows the email");`);
+    return "owner's profile from the restaurant; mine lists the review, no email";
+  });
+
   let newId;
   await step("create a restaurant with a photo", async () => {
     await go("/me/restaurants/new");
@@ -230,6 +242,34 @@ try {
   });
 
   if (asAdmin) {
+    await step("admin: rename the user, edit their restaurant", async () => {
+      await go(`/admin/users?q=${email}`);
+      await evaluate(`await waitFor(() => text().includes("${email}")); click("Eve K.", "a");
+        await waitFor(() => byText("button", "Log in as this user"));
+        fill("Display name", "Eve Renamed"); await waitFor(() => !byText("button", "Rename").disabled); click("Rename", "button");
+        await waitFor(() => document.querySelector("h1")?.textContent === "Eve Renamed");`);
+      await go(`/me/restaurants/${newId}/edit`);
+      await evaluate(`await waitFor(() => byText("button", "Save changes")); fill("Seats", "14");
+        click("Save changes", "button"); await waitFor(() => text().includes("Saved."), 10000);`);
+      await go(`/restaurants/${newId}`);
+      return evaluate(`await waitFor(() => text().includes("14 seats") && byText("a", "Edit")); return "renamed; 14 seats saved by the admin"`);
+    });
+
+    await step("admin: impersonate the user and switch back", async () => {
+      await go(`/restaurants/${newId}`);
+      await evaluate(`await waitFor(() => byText("a", "Owner")); click("Owner", "a");
+        await waitFor(() => byText("button", "Log in as this user")); click("Log in as this user", "button");
+        await waitFor(() => location.pathname === "/" && text().includes("You're using the app as Eve Renamed"));`);
+      await go("/me/restaurants");
+      await evaluate(`await waitFor(() => text().includes("${kitchen}") && text().includes("You're using the app as"));`);
+      await shot("impersonating");
+      await evaluate(`click("Back to", "button");
+        await waitFor(() => location.pathname.startsWith("/admin/users/") && byText("button", "Log in as this user") && !text().includes("You're using the app as"));
+        fill("Display name", "Eve K."); await waitFor(() => !byText("button", "Rename").disabled); click("Rename", "button");
+        await waitFor(() => document.querySelector("h1")?.textContent === "Eve K.");`);
+      return "saw their restaurants as them, back to admin";
+    });
+
     await step("admin: find the user and ban them", async () => {
       await go(`/admin/users?q=${email}`);
       await evaluate(`await waitFor(() => text().includes("${email}")); click("Eve K.", "a");

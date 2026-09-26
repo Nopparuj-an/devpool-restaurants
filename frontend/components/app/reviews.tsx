@@ -1,6 +1,7 @@
 "use client";
 
 import { BadgeCheck } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -16,7 +17,9 @@ export function ReviewItem({ review: r }: { review: Review }) {
   return (
     <article className="flex flex-col gap-2 border-b border-line py-5 last:border-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-medium">{r.author.display_name}</span>
+        <Link href={`/users/${r.author.id}`} className="font-medium hover:text-accent">
+          {r.author.display_name}
+        </Link>
         {r.author.email && <span className="text-sm text-muted">{r.author.email}</span>}
         {r.verified && (
           <span className="inline-flex items-center gap-1 text-xs text-success">

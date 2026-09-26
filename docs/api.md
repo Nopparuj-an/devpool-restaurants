@@ -10,20 +10,21 @@ The tests in `backend/internal/*/…_test.go` are the executable spec for these 
 | POST | `/auth/signup` | `{email, password, display_name}` | `201` Account + session cookie. `409 email_taken` |
 | POST | `/auth/login` | `{email, password}` | `200` Account + cookie. `401 invalid_credentials` |
 | POST | `/auth/logout` | – | `204`, cookie cleared |
-| GET 🔒 | `/me` | – | Account `{id, email, display_name, email_verified, has_password}` |
+| GET 🔒 | `/me` | – | Account `{id, email, display_name, email_verified, has_password, is_admin, impersonator?: {id, display_name}}` |
 | PUT 🔒 | `/me` | `{display_name}` (1 to 80 characters; the email can't change) | Account |
 | GET | `/auth/providers` | – | `{password: true, google: bool}`. Hide the Google button when it's false |
 | GET | `/auth/google/start?next=/path` | – | `302` to Google. Use as a plain link, not fetch |
 | GET | `/auth/google/callback` | (from Google) | `302` to `next` with a session, or to `/login?error=<code>` |
-| PUT 🔒 | `/me/password` | `{current_password, new_password}` (current is ignored if the account has no password yet) | `204` |
+| PUT 🔒 | `/me/password` | `{current_password, new_password}` (current is ignored if the account has no password yet) | `204`. `403 R-ADMIN-7` while impersonating |
+| POST 🔒 | `/auth/impersonate/stop` | – | Admin's Account + a new admin session cookie. `409 not_impersonating` otherwise |
 
 ## Restaurants
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| GET | `/restaurants` | `?sort=top_rated\|most_reviewed\|newest&q=&cuisine=&limit=&offset=` (`q` matches name or cuisine; limit ≤ 100, default 50) | `{restaurants: Summary[], total}` |
-| GET | `/restaurants/{id}` | – | Detail. Owners also get `is_owner: true` and `upcoming_reservations` |
+| GET | `/restaurants` | `?sort=top_rated\|most_reviewed\|newest&q=&cuisine=&owner_id=&limit=&offset=` (`q` matches name or cuisine; limit ≤ 100, default 50). With `owner_id`, the owner and admins also get hidden ones | `{restaurants: Summary[], total}` |
+| GET | `/restaurants/{id}` | – | Detail. `can_manage` for the owner and admins, who also get `upcoming_reservations` |
 | POST 🔒 | `/restaurants` | multipart: `data` = Input JSON, `images` = 1 to 10 files, 10 MB each (the first is the cover) | `201` Detail |
-| PUT 🔒 | `/restaurants/{id}` | Input JSON (owner only, `timezone` ignored) | Detail |
+| PUT 🔒 | `/restaurants/{id}` | Input JSON (owner or admin, `timezone` ignored) | Detail |
 | DELETE 🔒 | `/restaurants/{id}` | – | `204` (cascades, R-REST-5) |
 | GET 🔒 | `/me/restaurants` | `?limit=&offset=` | `{restaurants: Summary[], total}` |
 | POST 🔒 | `/restaurants/{id}/images` | multipart `images` | `201 {images}` |
@@ -33,7 +34,7 @@ The tests in `backend/internal/*/…_test.go` are the executable spec for these 
 **Input:** `{name, description, cuisine, location, seats, cancel_cutoff_minutes?, max_reservation_minutes?, timezone, hours: [{weekday 0-6 (0=Sun), open "HH:MM", close "HH:MM"}]}`. `timezone` is taken from the browser: `Intl.DateTimeFormat().resolvedOptions().timeZone`.
 
 **Summary:** `{id, name, cuisine, location, seats, rating (1 decimal or null), review_count, cover_url, owner: {id, display_name}}`. JSON drops trailing zeros (`5`, not `5.0`), so display it with `rating.toFixed(1)`.
-**Detail:** Summary plus `{description, cancel_cutoff_minutes, max_reservation_minutes, timezone, hours, images: [{id, url, is_cover}], is_owner}`.
+**Detail:** Summary plus `{description, cancel_cutoff_minutes, max_reservation_minutes, timezone, hours, images: [{id, url, is_cover}], is_owner, can_manage}`. Every change to a restaurant or its photos is allowed for the owner and admins (R-REST-2, R-ADMIN-6).
 
 Photos larger than 1600 px or 1 MB are resized to 1600 px and stored as JPEG (`platform/imageproc`). Images over 40 megapixels are rejected. The web app already resizes photos in the browser before upload (`lib/image.ts`).
 
@@ -48,7 +49,7 @@ Image URLs are relative (`/images/restaurants/…`). Next.js rewrites `/images/*
 | GET 🔒 | `/reservations/{id}` | – | Reservation (own only, otherwise `404`) |
 | PUT 🔒 | `/reservations/{id}` | `{pax, starts_at, ends_at}` | Reservation. `409 R-EDIT-1` past the cutoff, `409 not_active` if cancelled |
 | POST 🔒 | `/reservations/{id}/cancel` | – | Reservation. `409 R-CANCEL-1` past the cutoff |
-| GET 🔒 | `/restaurants/{id}/reservations` | `?from=&to=` (defaults to the next 7 days, at most 31) | Owner only. `{reservations}` with `customer: {id, display_name, email}` (R-PRIV-2) |
+| GET 🔒 | `/restaurants/{id}/reservations` | `?from=&to=` (defaults to the next 7 days, at most 31) | Owner or admin. `{reservations}` with `customer: {id, display_name, email}` (R-PRIV-2) |
 
 **Reservation:** `{id, pax, starts_at, ends_at, status: active|cancelled, state: upcoming|in_progress|completed|cancelled, modifiable_until, can_modify, restaurant: {id, name, cover_url}, customer?}`.
 
@@ -63,6 +64,8 @@ Admin session required (R-ADMIN-1): 401 when logged out, 403 `admin_only` for ot
 | GET | `/admin/users/{id}` | – | AdminUser + `owned_restaurants: AdminRestaurant[]` |
 | POST | `/admin/users/{id}/ban` | `{reason?}` | AdminUser. `409 R-ADMIN-5` for yourself or an admin |
 | POST | `/admin/users/{id}/unban` | – | AdminUser |
+| PUT | `/admin/users/{id}` | `{display_name}` | AdminUser (R-ADMIN-6) |
+| POST | `/admin/users/{id}/impersonate` | – | `204` + a session cookie as the user (R-ADMIN-7). `409 R-ADMIN-7` for yourself, an admin or a banned user |
 | GET | `/admin/restaurants` | – | `{restaurants: AdminRestaurant[], total}`. `q` matches name, cuisine or owner email. Includes hidden ones |
 | POST | `/admin/restaurants/{id}/ban` | `{reason?}` | `204` |
 | POST | `/admin/restaurants/{id}/unban` | – | `204` |
@@ -73,6 +76,14 @@ Admin session required (R-ADMIN-1): 401 when logged out, 403 `admin_only` for ot
 Hidden restaurants (R-ADMIN-4) return 404 to everyone except their owner and admins. For those two, Summary and Detail carry `banned`, `owner_banned` and `ban_reason`. `Account` has `is_admin`. Logging in to a banned account returns `403 account_banned`.
 
 A Bruno collection with every endpoint is in `backend/bruno/` (see the README).
+
+## Profiles
+| Method | Path | Query | Returns |
+|---|---|---|---|
+| GET | `/users/{id}` | – | `{id, display_name, created_at, restaurant_count, review_count, banned?}`. No email. `404` for banned accounts unless you're an admin (R-PROFILE-2) |
+| GET | `/users/{id}/reviews` | `?limit=&offset=` (limit ≤ 100, default 20) | `{reviews: [{id, rating, body, verified, created_at, updated_at, restaurant: {id, name, cover_url}, hidden?}], total}`, newest first |
+
+A profile's restaurants: `GET /restaurants?owner_id={id}`.
 
 ## Reviews
 | Method | Path | Body / query | Returns |

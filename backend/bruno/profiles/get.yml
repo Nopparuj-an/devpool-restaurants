@@ -1,0 +1,20 @@
+info:
+  name: "/users/:id"
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/users/{{user_id}}"
+  auth: inherit
+
+docs:
+  content: |-
+    Public profile: name, joined, counts. Never the email (R-PRIV-1). Banned users: 404 except for admins (R-PROFILE-2).
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

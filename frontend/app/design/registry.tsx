@@ -13,6 +13,7 @@ import {
   MyBookingsScreen,
   MyRestaurantsScreen,
   OwnerBookingsScreen,
+  ProfileScreen,
   RestaurantEditorScreen,
   RestaurantScreen,
 } from "@/components/screens/screens";
@@ -155,7 +156,38 @@ const screens = {
       />
     ),
   },
-  "admin-user": { render: () => <AdminUserScreen account={mock.admin} user={mock.adminUserDetail} onBan={done} /> },
+  profile: {
+    render: () => (
+      <ProfileScreen
+        account={mock.account}
+        profile={mock.profile}
+        restaurants={[]}
+        restaurantsTotal={0}
+        reviews={mock.profileReviews}
+        reviewsTotal={mock.profileReviews.length}
+      />
+    ),
+  },
+  "profile-owner": {
+    render: () => (
+      <ProfileScreen
+        account={mock.admin}
+        profile={mock.ownerProfile}
+        restaurants={mock.summaries.slice(0, 3)}
+        restaurantsTotal={3}
+        reviews={[]}
+        reviewsTotal={0}
+      />
+    ),
+  },
+  impersonating: {
+    render: () => <MyBookingsScreen account={mock.impersonated} reservations={mock.myReservations} onCancel={done} onChange={() => {}} />,
+  },
+  "admin-user": {
+    render: () => (
+      <AdminUserScreen account={mock.admin} user={mock.adminUserDetail} onBan={done} onRename={ok} onImpersonate={ok} />
+    ),
+  },
   "admin-restaurants": {
     render: () => (
       <AdminRestaurantsScreen

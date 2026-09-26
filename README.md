@@ -54,7 +54,7 @@ All passwords are `password123`.
 | `malee@example.com` | Owns Midnight Moo Kra Ta (18:00–02:00) and Sabai 24h Café (open 24h) |
 | `alice@example.com` | Customer with upcoming and past bookings and verified reviews |
 | `bob@example.com`, `carol@example.com`, `dan@example.com` | Customers |
-| `admin@example.com` | Admin: `/admin` to list users and restaurants and ban or unban them |
+| `admin@example.com` | Admin: `/admin` to list users and restaurants, ban or unban them, rename users and edit any restaurant. On a user's admin page, **Log in as this user** switches to their account for a demo; the banner at the top switches back |
 
 Admin rights are granted in the database only: `make admin EMAIL=you@example.com` (and `make admin-revoke`).
 

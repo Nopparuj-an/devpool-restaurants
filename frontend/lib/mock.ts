@@ -8,6 +8,8 @@ import type {
   AdminUserDetail,
   Availability,
   Hours,
+  Profile,
+  ProfileReview,
   Reservation,
   RestaurantDetail,
   RestaurantSummary,
@@ -74,6 +76,7 @@ export const restaurants: RestaurantDetail[] = [
     max_reservation_minutes: 240,
     timezone: "Asia/Bangkok",
     hours: daily("11:00", "22:00", [1]),
+    can_manage: false,
     images: [
       { id: 1, url: photo(1), is_cover: true },
       { id: 2, url: photo(3), is_cover: false },
@@ -96,6 +99,7 @@ export const restaurants: RestaurantDetail[] = [
     max_reservation_minutes: 240,
     timezone: "Asia/Bangkok",
     hours: daily("10:00", "21:00"),
+    can_manage: false,
     images: [{ id: 4, url: photo(2), is_cover: true }],
     is_owner: false,
   },
@@ -114,6 +118,7 @@ export const restaurants: RestaurantDetail[] = [
     max_reservation_minutes: 120,
     timezone: "Asia/Bangkok",
     hours: daily("09:00", "16:00"),
+    can_manage: false,
     images: [{ id: 5, url: photo(3), is_cover: true }],
     is_owner: false,
   },
@@ -132,6 +137,7 @@ export const restaurants: RestaurantDetail[] = [
     max_reservation_minutes: 180,
     timezone: "Asia/Bangkok",
     hours: daily("18:00", "02:00"),
+    can_manage: false,
     images: [{ id: 6, url: photo(5), is_cover: true }],
     is_owner: false,
   },
@@ -150,6 +156,7 @@ export const restaurants: RestaurantDetail[] = [
     max_reservation_minutes: 120,
     timezone: "Asia/Bangkok",
     hours: daily("00:00", "00:00"),
+    can_manage: false,
     images: [{ id: 7, url: photo(4), is_cover: true }],
     is_owner: false,
   },
@@ -170,7 +177,7 @@ export const summaries: RestaurantSummary[] = restaurants.map(
 );
 
 // The same restaurant as its owner sees it.
-export const ownedRestaurant: RestaurantDetail = { ...restaurants[0], is_owner: true, upcoming_reservations: 12 };
+export const ownedRestaurant: RestaurantDetail = { ...restaurants[0], is_owner: true, can_manage: true, upcoming_reservations: 12 };
 
 // Availability for ครัวริมคลอง, days from MOCK_NOW. Tomorrow's lunch is almost full.
 export function availability(dayOffset: number): Availability {
@@ -342,3 +349,29 @@ export const adminUserDetail: AdminUserDetail = {
   ...adminUsers[4],
   owned_restaurants: adminRestaurants.filter((r) => r.owner.id === 1),
 };
+
+// Public profile of Alice (a reviewer) and Somchai (an owner).
+export const profile: Profile = {
+  id: 3,
+  display_name: "Alice",
+  created_at: ago(90),
+  restaurant_count: 0,
+  review_count: 3,
+};
+
+export const profileReviews: ProfileReview[] = [
+  { ...reviews[0], restaurant: ref(restaurants[0]) },
+  { id: 11, rating: 4, body: "Crispy pork was great. The rice ran out by 8.", verified: false, created_at: ago(20), updated_at: ago(20), restaurant: ref(restaurants[1]) },
+  { id: 12, rating: 3, body: "Nice view, slow service.", verified: true, created_at: ago(40), updated_at: ago(40), restaurant: ref(restaurants[2]) },
+];
+
+export const ownerProfile: Profile = {
+  id: 1,
+  display_name: "Somchai",
+  created_at: ago(31),
+  restaurant_count: 3,
+  review_count: 0,
+};
+
+// An admin acting as Alice (R-ADMIN-7).
+export const impersonated: Account = { ...account, impersonator: { id: admin.id, display_name: admin.display_name } };
