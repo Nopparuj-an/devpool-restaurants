@@ -2,7 +2,7 @@
 COMPOSE := docker compose -f deployment/docker-compose.yml
 ENV_FILE := deployment/.env
 
-.PHONY: help env up down ps logs garage-init psql api test fmt vet
+.PHONY: help env up down ps logs garage-init psql api seed test fmt vet
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -29,11 +29,16 @@ garage-init: ## One-time Garage layout/key/bucket setup (idempotent)
 psql: ## Open psql in the Postgres container
 	$(COMPOSE) exec postgres sh -c 'psql -U $$POSTGRES_USER -d $$POSTGRES_DB'
 
+# Env for running Go commands on the host against the compose infra.
+HOST_ENV = set -a && . ../$(ENV_FILE) && set +a && \
+	  export DATABASE_URL="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/$$POSTGRES_DB?sslmode=disable" \
+	  S3_ENDPOINT=http://localhost:3900 COOKIE_SECURE=false
+
 api: ## Run the Go API on the host (applies migrations on start)
-	cd backend && set -a && . ../$(ENV_FILE) && set +a && \
-	  DATABASE_URL="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/$$POSTGRES_DB?sslmode=disable" \
-	  S3_ENDPOINT=http://localhost:3900 \
-	  COOKIE_SECURE=false go run ./cmd/api
+	cd backend && $(HOST_ENV) && go run ./cmd/api
+
+seed: ## Load demo accounts, restaurants, bookings, reviews (no-op if already seeded)
+	cd backend && $(HOST_ENV) && go run ./cmd/seed
 
 test: ## Run backend tests (integration tests use throwaway DBs on the compose Postgres)
 	cd backend && set -a && . ../$(ENV_FILE) && set +a && \

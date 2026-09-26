@@ -15,6 +15,7 @@ Restaurant reservation + review app (PEA DevPool 2026 final exam). Next.js front
 make env          # first time: create deployment/.env with random secrets
 make up           # Postgres + Garage (data in deployment/data/)
 make garage-init  # first time: Garage layout, key, bucket, website mode
+make seed         # demo data (no-op if already seeded)
 make api          # run Go API on :8080 (applies migrations)
 make test         # backend tests
 ```

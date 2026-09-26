@@ -37,7 +37,7 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 - [ ] Limited Seats Left badge (frontend)
 - [x] Search/filter by name, cuisine (API)
 - [ ] Stretch: holidays/closures, search by free time
-- [ ] Seed data + test accounts; README (run, accounts, env vars)
+- [x] Seed data + test accounts; README (run, accounts, env vars)
 
 ## M5 — Submit (10–11 Oct)
 - [ ] Record ≤5 min video: demo all features + walk through `peakLoad` + booking tx
