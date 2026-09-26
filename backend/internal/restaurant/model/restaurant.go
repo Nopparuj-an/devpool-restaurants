@@ -3,6 +3,12 @@ package model
 
 import "restaurants/internal/booking"
 
+// Actor is who is changing a restaurant: its owner, or an admin (R-REST-2, R-ADMIN-6).
+type Actor struct {
+	ID    int64
+	Admin bool
+}
+
 // Input is the editable part of a restaurant (create and update).
 type Input struct {
 	Name                  string  `json:"name"`
@@ -82,8 +88,10 @@ type Detail struct {
 	Hours                 []Hours `json:"hours"`
 	Images                []Image `json:"images"`
 	IsOwner               bool    `json:"is_owner"`
-	BanReason             string  `json:"ban_reason,omitempty"` // owner and admins only
-	// UpcomingReservations is only set for the owner, e.g. to warn before delete (R-REST-5).
+	// CanManage: the viewer may edit, delete and see bookings (owner or admin, R-ADMIN-6).
+	CanManage bool   `json:"can_manage"`
+	BanReason string `json:"ban_reason,omitempty"` // owner and admins only
+	// UpcomingReservations is only set for the owner and admins, e.g. to warn before delete (R-REST-5).
 	UpcomingReservations *int `json:"upcoming_reservations,omitempty"`
 }
 
@@ -92,7 +100,7 @@ type ListQuery struct {
 	Q       string // name or cuisine contains, case-insensitive
 	Cuisine string // exact, case-insensitive
 	OwnerID int64  // 0 = any
-	// IncludeHidden also lists banned restaurants (the owner's own list).
+	// IncludeHidden also lists banned restaurants (the owner's own list, admins).
 	IncludeHidden bool
 	Limit         int
 	Offset        int

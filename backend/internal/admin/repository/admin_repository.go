@@ -110,6 +110,14 @@ func (r *Repository) SetUserBan(ctx context.Context, id int64, at *time.Time, re
 	return err
 }
 
+func (r *Repository) SetDisplayName(ctx context.Context, id int64, name string) error {
+	tag, err := r.db.Conn(ctx).Exec(ctx, `UPDATE accounts SET display_name = $2 WHERE id = $1`, id, name)
+	if err == nil && tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
+	}
+	return err
+}
+
 func (r *Repository) DeleteSessions(ctx context.Context, accountID int64) error {
 	_, err := r.db.Conn(ctx).Exec(ctx, `DELETE FROM sessions WHERE account_id = $1`, accountID)
 	return err

@@ -14,6 +14,11 @@ var (
 	ErrGoogleDisabled        = apperr.New(apperr.NotFound, "google_disabled", "Google login is not configured")
 	ErrBanned                = apperr.New(apperr.Forbidden, "account_banned", "this account has been suspended")
 	ErrAdminOnly             = apperr.New(apperr.Forbidden, "admin_only", "only admins can do this")
+	ErrImpersonateSelf       = apperr.New(apperr.Conflict, "R-ADMIN-7", "you're already logged in as yourself")
+	ErrImpersonateAdmin      = apperr.New(apperr.Conflict, "R-ADMIN-7", "admins can't be impersonated")
+	ErrImpersonateBanned     = apperr.New(apperr.Conflict, "R-ADMIN-7", "banned users can't be impersonated; unban them first")
+	ErrNotImpersonating      = apperr.New(apperr.Conflict, "not_impersonating", "this session isn't impersonating anyone")
+	ErrWhileImpersonating    = apperr.New(apperr.Forbidden, "R-ADMIN-7", "you can't change the password while impersonating")
 
 	// ErrNoSession means the cookie is missing, unknown or expired. It is not
 	// shown to clients; the request simply continues logged out.

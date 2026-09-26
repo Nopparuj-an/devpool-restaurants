@@ -1,7 +1,7 @@
 // Package auth is the accounts, login and session feature (ADR-0002).
 //
 //	routes.go            URL → handler
-//	handler.go           password signup/login/logout, me, change password
+//	handler.go           password signup/login/logout, me, change password, impersonation
 //	google_handler.go    Sign in with Google (OIDC)
 //	middleware.go        session cookie → current account, RequireLogin
 //	module.go            wiring
@@ -11,11 +11,13 @@
 package auth
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"restaurants/internal/auth/model"
 	"restaurants/internal/auth/service"
 	"restaurants/internal/platform/config"
 	"restaurants/internal/platform/web"
@@ -113,10 +115,45 @@ func (h *Handler) SetPassword(c *gin.Context) error {
 	if err := web.Decode(c, &in); err != nil {
 		return err
 	}
-	if err := h.svc.SetPassword(c.Request.Context(), MustAccount(c).ID, in.CurrentPassword, in.NewPassword); err != nil {
+	me := MustAccount(c)
+	if me.Impersonator != nil {
+		return model.ErrWhileImpersonating
+	}
+	if err := h.svc.SetPassword(c.Request.Context(), me.ID, in.CurrentPassword, in.NewPassword); err != nil {
 		return err
 	}
 	c.Status(http.StatusNoContent)
+	return nil
+}
+
+// Impersonate swaps the admin's session for one as the user (R-ADMIN-7).
+func (h *Handler) Impersonate(c *gin.Context) error {
+	id, err := web.PathID(c, "id")
+	if err != nil {
+		return err
+	}
+	admin := MustAccount(c)
+	token, _ := c.Cookie(cookieName)
+	sess, err := h.svc.Impersonate(c.Request.Context(), admin, token, id)
+	if err != nil {
+		return err
+	}
+	slog.Info("impersonation started", "admin", admin.ID, "user", id)
+	h.setCookie(c, sess)
+	c.Status(http.StatusNoContent)
+	return nil
+}
+
+// StopImpersonating logs the admin back in as themselves.
+func (h *Handler) StopImpersonating(c *gin.Context) error {
+	token, _ := c.Cookie(cookieName)
+	sess, admin, err := h.svc.StopImpersonating(c.Request.Context(), token)
+	if err != nil {
+		return err
+	}
+	slog.Info("impersonation stopped", "admin", admin.ID, "user", MustAccount(c).ID)
+	h.setCookie(c, sess)
+	c.JSON(http.StatusOK, admin)
 	return nil
 }
 
@@ -130,6 +167,11 @@ func (h *Handler) startSession(c *gin.Context, accountID int64) error {
 	if err != nil {
 		return err
 	}
+	h.setCookie(c, sess)
+	return nil
+}
+
+func (h *Handler) setCookie(c *gin.Context, sess model.Session) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     cookieName,
 		Value:    sess.Token,
@@ -139,7 +181,6 @@ func (h *Handler) startSession(c *gin.Context, accountID int64) error {
 		Secure:   h.secureCookie,
 		SameSite: http.SameSiteLaxMode, // blocks cross-site POSTs from carrying the cookie (CSRF)
 	})
-	return nil
 }
 
 func (h *Handler) clearCookie(c *gin.Context) {

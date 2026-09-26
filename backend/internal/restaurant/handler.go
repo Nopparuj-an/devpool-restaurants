@@ -31,11 +31,22 @@ type Handler struct {
 
 func NewHandler(svc service.Service) *Handler { return &Handler{svc: svc} }
 
+// actor is the logged-in account making a change (R-REST-2, R-ADMIN-6).
+func actor(c *gin.Context) model.Actor {
+	id, admin := auth.Viewer(c)
+	return model.Actor{ID: id, Admin: admin}
+}
+
+// List takes ?sort=&q=&cuisine=&owner_id=&limit=&offset=. With owner_id (a
+// profile page), the owner and admins also see hidden restaurants.
 func (h *Handler) List(c *gin.Context) error {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
+	ownerID, _ := strconv.ParseInt(c.Query("owner_id"), 10, 64)
+	viewer, admin := auth.Viewer(c)
 	list, total, err := h.svc.List(c.Request.Context(), model.ListQuery{
 		Sort: c.Query("sort"), Q: c.Query("q"), Cuisine: c.Query("cuisine"), Limit: limit, Offset: offset,
+		OwnerID: ownerID, IncludeHidden: ownerID > 0 && (admin || viewer == ownerID),
 	})
 	if err != nil {
 		return err
@@ -99,8 +110,7 @@ func (h *Handler) Update(c *gin.Context) error {
 	if err := web.Decode(c, &in); err != nil {
 		return err
 	}
-	me := auth.MustAccount(c).ID
-	if err := h.svc.Update(c.Request.Context(), me, id, in); err != nil {
+	if err := h.svc.Update(c.Request.Context(), actor(c), id, in); err != nil {
 		return err
 	}
 	return h.writeDetail(c, id, http.StatusOK)
@@ -111,7 +121,7 @@ func (h *Handler) Delete(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := h.svc.Delete(c.Request.Context(), auth.MustAccount(c).ID, id); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), actor(c), id); err != nil {
 		return err
 	}
 	c.Status(http.StatusNoContent)

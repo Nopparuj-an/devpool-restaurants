@@ -52,14 +52,15 @@ type TxRunner interface {
 }
 
 // Service is the inbound port used by the HTTP handlers. `me` is the
-// logged-in account; every change checks that me owns the restaurant (R-REST-2).
+// logged-in account. Every change checks that `by` owns the restaurant or is
+// an admin (R-REST-2, R-ADMIN-6).
 type Service interface {
 	Create(ctx context.Context, me int64, in model.Input, uploads []model.Upload) (int64, error)
-	Update(ctx context.Context, me, id int64, in model.Input) error
-	Delete(ctx context.Context, me, id int64) error
-	AddImages(ctx context.Context, me, id int64, uploads []model.Upload) error
-	DeleteImage(ctx context.Context, me, id, imageID int64) error
-	SetCover(ctx context.Context, me, id, imageID int64) error
+	Update(ctx context.Context, by model.Actor, id int64, in model.Input) error
+	Delete(ctx context.Context, by model.Actor, id int64) error
+	AddImages(ctx context.Context, by model.Actor, id int64, uploads []model.Upload) error
+	DeleteImage(ctx context.Context, by model.Actor, id, imageID int64) error
+	SetCover(ctx context.Context, by model.Actor, id, imageID int64) error
 	// List returns one page (limit ≤ 100, default 50) and the total number of matches.
 	List(ctx context.Context, q model.ListQuery) ([]model.Summary, int, error)
 	// Get returns one restaurant. viewer is the logged-in account ID or 0;
@@ -79,12 +80,12 @@ func New(repo Repository, images ImageStore, tx TxRunner, imageBaseURL string) S
 	return &service{repo: repo, images: images, tx: tx, imageBaseURL: strings.TrimSuffix(imageBaseURL, "/"), now: time.Now}
 }
 
-func (s *service) lockOwned(ctx context.Context, id, me int64) error {
+func (s *service) lockOwned(ctx context.Context, id int64, by model.Actor) error {
 	owner, err := s.repo.LockOwner(ctx, id)
 	if err != nil {
 		return err
 	}
-	if owner != me {
+	if owner != by.ID && !by.Admin {
 		return model.ErrNotOwner
 	}
 	return nil
@@ -126,13 +127,13 @@ func (s *service) Create(ctx context.Context, me int64, in model.Input, uploads 
 
 // Update replaces the editable fields and hours. Existing reservations are
 // never touched (R-REST-4). The timezone can't change after creation.
-func (s *service) Update(ctx context.Context, me, id int64, in model.Input) error {
+func (s *service) Update(ctx context.Context, by model.Actor, id int64, in model.Input) error {
 	v, err := validate(in, false)
 	if err != nil {
 		return err
 	}
 	return s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		if err := s.lockOwned(ctx, id, me); err != nil {
+		if err := s.lockOwned(ctx, id, by); err != nil {
 			return err
 		}
 		if err := s.repo.UpdateDetails(ctx, id, v); err != nil {
@@ -144,10 +145,10 @@ func (s *service) Update(ctx context.Context, me, id int64, in model.Input) erro
 
 // Delete removes the restaurant; reservations, reviews and image rows
 // cascade in the database (R-REST-5). Image objects go after commit.
-func (s *service) Delete(ctx context.Context, me, id int64) error {
+func (s *service) Delete(ctx context.Context, by model.Actor, id int64) error {
 	var keys []string
 	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		if err := s.lockOwned(ctx, id, me); err != nil {
+		if err := s.lockOwned(ctx, id, by); err != nil {
 			return err
 		}
 		var err error
@@ -163,13 +164,13 @@ func (s *service) Delete(ctx context.Context, me, id int64) error {
 	return nil
 }
 
-func (s *service) AddImages(ctx context.Context, me, id int64, uploads []model.Upload) error {
+func (s *service) AddImages(ctx context.Context, by model.Actor, id int64, uploads []model.Upload) error {
 	if len(uploads) == 0 {
 		return model.ErrNoImages
 	}
 	var keys []string
 	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		if err := s.lockOwned(ctx, id, me); err != nil {
+		if err := s.lockOwned(ctx, id, by); err != nil {
 			return err
 		}
 		var err error
@@ -217,10 +218,10 @@ func (s *service) putImages(ctx context.Context, id int64, uploads []model.Uploa
 
 // DeleteImage removes one image. The last one can't go (R-REST-1); removing
 // the cover promotes the next image.
-func (s *service) DeleteImage(ctx context.Context, me, id, imageID int64) error {
+func (s *service) DeleteImage(ctx context.Context, by model.Actor, id, imageID int64) error {
 	var key string
 	err := s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		if err := s.lockOwned(ctx, id, me); err != nil {
+		if err := s.lockOwned(ctx, id, by); err != nil {
 			return err
 		}
 		stats, err := s.repo.ImageStats(ctx, id)
@@ -246,9 +247,9 @@ func (s *service) DeleteImage(ctx context.Context, me, id, imageID int64) error 
 	return nil
 }
 
-func (s *service) SetCover(ctx context.Context, me, id, imageID int64) error {
+func (s *service) SetCover(ctx context.Context, by model.Actor, id, imageID int64) error {
 	return s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		if err := s.lockOwned(ctx, id, me); err != nil {
+		if err := s.lockOwned(ctx, id, by); err != nil {
 			return err
 		}
 		return s.repo.SetCover(ctx, id, imageID)
@@ -289,8 +290,9 @@ func (s *service) Get(ctx context.Context, viewer int64, admin bool, id int64) (
 	for i := range d.Images {
 		d.Images[i].URL = s.url(d.Images[i].Key)
 	}
-	d.IsOwner = viewer != 0 && viewer == d.Owner.ID
-	if d.IsOwner {
+	d.IsOwner = owner
+	d.CanManage = owner || admin
+	if d.CanManage {
 		n, err := s.repo.UpcomingReservations(ctx, id, s.now())
 		if err != nil {
 			return d, err

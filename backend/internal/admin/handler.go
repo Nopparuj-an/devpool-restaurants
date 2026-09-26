@@ -1,5 +1,7 @@
 // Package admin is moderation for admins (R-ADMIN-*): list users and
-// restaurants, see what a user owns, and ban or unban either. Admin rights
+// restaurants, see what a user owns, edit a user's profile, and ban or unban
+// either. Admins edit restaurants through the restaurant routes (R-ADMIN-6);
+// impersonation is in the auth module, since it swaps the session cookie. Admin rights
 // are granted in the database only (`make admin EMAIL=…`).
 //
 //	routes.go        URL → handler (all behind RequireLogin + RequireAdmin)
@@ -61,6 +63,23 @@ func (h *Handler) GetUser(c *gin.Context) error {
 		return err
 	}
 	u, err := h.svc.GetUser(c.Request.Context(), id)
+	if err != nil {
+		return err
+	}
+	c.JSON(http.StatusOK, u)
+	return nil
+}
+
+func (h *Handler) UpdateUser(c *gin.Context) error {
+	id, err := web.PathID(c, "id")
+	if err != nil {
+		return err
+	}
+	var in model.UserInput
+	if err := web.Decode(c, &in); err != nil {
+		return err
+	}
+	u, err := h.svc.UpdateUser(c.Request.Context(), id, in)
 	if err != nil {
 		return err
 	}

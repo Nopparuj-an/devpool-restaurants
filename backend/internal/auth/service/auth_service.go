@@ -28,7 +28,12 @@ type Repository interface {
 	InsertPassword(ctx context.Context, accountID int64, hash string) error
 	UpdatePassword(ctx context.Context, accountID int64, hash string) error
 
-	CreateSession(ctx context.Context, tokenHash []byte, accountID int64, expires time.Time) error
+	// CreateSession stores a session; impersonator is the admin behind an
+	// impersonation session, 0 for a normal login.
+	CreateSession(ctx context.Context, tokenHash []byte, accountID, impersonator int64, expires time.Time) error
+	// AccountBySession fills Account.Impersonator for impersonation sessions.
+	// Those are dropped (ErrNotFound) once the impersonator is no longer an
+	// admin or is banned.
 	AccountBySession(ctx context.Context, tokenHash []byte, now time.Time) (model.Account, error)
 	DeleteSession(ctx context.Context, tokenHash []byte) error
 
@@ -57,6 +62,11 @@ type Service interface {
 	CreateSession(ctx context.Context, accountID int64) (model.Session, error)
 	AccountForSession(ctx context.Context, token string) (model.Account, error)
 	DeleteSession(ctx context.Context, token string) error
+	// Impersonate ends the admin's session (token) and starts one as the
+	// target user that remembers the admin (R-ADMIN-7).
+	Impersonate(ctx context.Context, admin model.Account, token string, targetID int64) (model.Session, error)
+	// StopImpersonating ends the impersonation session and logs the admin back in.
+	StopImpersonating(ctx context.Context, token string) (model.Session, model.Account, error)
 }
 
 type service struct {
@@ -243,7 +253,66 @@ func (s *service) CreateSession(ctx context.Context, accountID int64) (model.Ses
 		return model.Session{}, err
 	}
 	sess := model.Session{Token: base64.RawURLEncoding.EncodeToString(raw), Expires: s.now().Add(model.SessionTTL)}
-	return sess, s.repo.CreateSession(ctx, hashToken(sess.Token), accountID, sess.Expires)
+	return sess, s.repo.CreateSession(ctx, hashToken(sess.Token), accountID, 0, sess.Expires)
+}
+
+func (s *service) Impersonate(ctx context.Context, admin model.Account, token string, targetID int64) (model.Session, error) {
+	switch {
+	case !admin.IsAdmin:
+		return model.Session{}, model.ErrAdminOnly
+	case admin.Impersonator != nil:
+		// Already a stand-in: switch back first, so the chain is never longer than one.
+		return model.Session{}, model.ErrAdminOnly
+	case admin.ID == targetID:
+		return model.Session{}, model.ErrImpersonateSelf
+	}
+	target, err := s.repo.Account(ctx, targetID)
+	switch {
+	case errors.Is(err, model.ErrNotFound):
+		return model.Session{}, apperr.ErrNotFound
+	case err != nil:
+		return model.Session{}, err
+	case target.IsAdmin:
+		return model.Session{}, model.ErrImpersonateAdmin
+	case target.Banned:
+		return model.Session{}, model.ErrImpersonateBanned
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return model.Session{}, err
+	}
+	sess := model.Session{Token: base64.RawURLEncoding.EncodeToString(raw), Expires: s.now().Add(model.ImpersonationTTL)}
+	err = s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		if err := s.repo.DeleteSession(ctx, hashToken(token)); err != nil {
+			return err
+		}
+		return s.repo.CreateSession(ctx, hashToken(sess.Token), target.ID, admin.ID, sess.Expires)
+	})
+	return sess, err
+}
+
+func (s *service) StopImpersonating(ctx context.Context, token string) (model.Session, model.Account, error) {
+	a, err := s.AccountForSession(ctx, token)
+	if err != nil {
+		return model.Session{}, model.Account{}, err
+	}
+	if a.Impersonator == nil {
+		return model.Session{}, model.Account{}, model.ErrNotImpersonating
+	}
+	var sess model.Session
+	err = s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		if err := s.repo.DeleteSession(ctx, hashToken(token)); err != nil {
+			return err
+		}
+		var err error
+		sess, err = s.CreateSession(ctx, a.Impersonator.ID)
+		return err
+	})
+	if err != nil {
+		return model.Session{}, model.Account{}, err
+	}
+	admin, err := s.repo.Account(ctx, a.Impersonator.ID)
+	return sess, admin, err
 }
 
 func (s *service) AccountForSession(ctx context.Context, token string) (model.Account, error) {

@@ -87,17 +87,34 @@ func (r *Repository) UpdatePassword(ctx context.Context, accountID int64, hash s
 	return err
 }
 
-func (r *Repository) CreateSession(ctx context.Context, tokenHash []byte, accountID int64, expires time.Time) error {
+func (r *Repository) CreateSession(ctx context.Context, tokenHash []byte, accountID, impersonator int64, expires time.Time) error {
 	_, err := r.db.Conn(ctx).Exec(ctx,
-		`INSERT INTO sessions (token_hash, account_id, expires_at) VALUES ($1, $2, $3)`, tokenHash, accountID, expires)
+		`INSERT INTO sessions (token_hash, account_id, impersonator_id, expires_at) VALUES ($1, $2, nullif($3, 0::bigint), $4)`,
+		tokenHash, accountID, impersonator, expires)
 	return err
 }
 
 func (r *Repository) AccountBySession(ctx context.Context, tokenHash []byte, now time.Time) (model.Account, error) {
-	return scanAccount(r.db.Conn(ctx).QueryRow(ctx, `
-		SELECT `+accountColumns+`
+	var (
+		a       model.Account
+		impID   *int64
+		impName *string
+	)
+	err := r.db.Conn(ctx).QueryRow(ctx, `
+		SELECT `+accountColumns+`, x.id, x.display_name
 		FROM sessions s JOIN accounts a ON a.id = s.account_id
-		WHERE s.token_hash = $1 AND s.expires_at > $2 AND a.banned_at IS NULL`, tokenHash, now))
+		LEFT JOIN accounts x ON x.id = s.impersonator_id
+		WHERE s.token_hash = $1 AND s.expires_at > $2 AND a.banned_at IS NULL
+			-- an impersonation session dies with the admin's rights (R-ADMIN-7)
+			AND (s.impersonator_id IS NULL OR (x.is_admin AND x.banned_at IS NULL))`, tokenHash, now).
+		Scan(&a.ID, &a.Email, &a.DisplayName, &a.EmailVerified, &a.HasPassword, &a.IsAdmin, &a.Banned, &impID, &impName)
+	if database.IsNoRows(err) {
+		return a, model.ErrNotFound
+	}
+	if impID != nil {
+		a.Impersonator = &model.Impersonator{ID: *impID, DisplayName: *impName}
+	}
+	return a, err
 }
 
 func (r *Repository) DeleteSession(ctx context.Context, tokenHash []byte) error {

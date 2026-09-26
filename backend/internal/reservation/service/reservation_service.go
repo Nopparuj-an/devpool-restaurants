@@ -51,7 +51,8 @@ type Service interface {
 	Get(ctx context.Context, me, id int64) (model.Reservation, error)
 	// ListMine returns one page (limit ≤ 100, default 50) and the total.
 	ListMine(ctx context.Context, me int64, limit, offset int) ([]model.Reservation, int, error)
-	ListForOwner(ctx context.Context, me, restaurantID int64, from, to time.Time) ([]model.Reservation, error)
+	// ListForOwner is the owner's booking table; admins may see it too (R-ADMIN-6).
+	ListForOwner(ctx context.Context, me int64, admin bool, restaurantID int64, from, to time.Time) ([]model.Reservation, error)
 	Availability(ctx context.Context, restaurantID int64, from, to time.Time) (model.Availability, error)
 }
 
@@ -163,12 +164,12 @@ func (s *service) ListMine(ctx context.Context, me int64, limit, offset int) ([]
 	return list, total, err
 }
 
-func (s *service) ListForOwner(ctx context.Context, me, restaurantID int64, from, to time.Time) ([]model.Reservation, error) {
+func (s *service) ListForOwner(ctx context.Context, me int64, admin bool, restaurantID int64, from, to time.Time) ([]model.Reservation, error) {
 	_, owner, err := s.repo.RestaurantRules(ctx, restaurantID, false, true)
 	if err != nil {
 		return nil, err
 	}
-	if owner != me {
+	if owner != me && !admin {
 		return nil, model.ErrOwnerOnly
 	}
 	now := s.now()

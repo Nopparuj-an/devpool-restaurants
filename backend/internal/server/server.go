@@ -19,6 +19,7 @@ import (
 	"restaurants/internal/platform/database"
 	"restaurants/internal/platform/storage"
 	"restaurants/internal/platform/web"
+	"restaurants/internal/profile"
 	"restaurants/internal/reservation"
 	"restaurants/internal/restaurant"
 	"restaurants/internal/review"
@@ -57,6 +58,7 @@ func New(pool *pgxpool.Pool, opts Options) *gin.Engine {
 	reservation.RegisterRoutes(api, reservation.NewModule(db, opts.ImageBaseURL))
 	review.RegisterRoutes(api, review.NewModule(db))
 	admin.RegisterRoutes(api, admin.NewModule(db))
+	profile.RegisterRoutes(api, profile.NewModule(db, opts.ImageBaseURL))
 	return r
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"restaurants/internal/auth"
 	"restaurants/internal/platform/apperr"
 	"restaurants/internal/platform/web"
 	"restaurants/internal/restaurant/model"
@@ -41,11 +40,10 @@ func (h *Handler) AddImages(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	me := auth.MustAccount(c).ID
-	if err := h.svc.AddImages(c.Request.Context(), me, id, uploads); err != nil {
+	if err := h.svc.AddImages(c.Request.Context(), actor(c), id, uploads); err != nil {
 		return err
 	}
-	return h.writeImages(c, me, id, http.StatusCreated)
+	return h.writeImages(c, id, http.StatusCreated)
 }
 
 func (h *Handler) DeleteImage(c *gin.Context) error {
@@ -53,11 +51,10 @@ func (h *Handler) DeleteImage(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	me := auth.MustAccount(c).ID
-	if err := h.svc.DeleteImage(c.Request.Context(), me, id, imageID); err != nil {
+	if err := h.svc.DeleteImage(c.Request.Context(), actor(c), id, imageID); err != nil {
 		return err
 	}
-	return h.writeImages(c, me, id, http.StatusOK)
+	return h.writeImages(c, id, http.StatusOK)
 }
 
 func (h *Handler) SetCover(c *gin.Context) error {
@@ -65,15 +62,15 @@ func (h *Handler) SetCover(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	me := auth.MustAccount(c).ID
-	if err := h.svc.SetCover(c.Request.Context(), me, id, imageID); err != nil {
+	if err := h.svc.SetCover(c.Request.Context(), actor(c), id, imageID); err != nil {
 		return err
 	}
-	return h.writeImages(c, me, id, http.StatusOK)
+	return h.writeImages(c, id, http.StatusOK)
 }
 
-func (h *Handler) writeImages(c *gin.Context, me, id int64, status int) error {
-	d, err := h.svc.Get(c.Request.Context(), me, false, id)
+func (h *Handler) writeImages(c *gin.Context, id int64, status int) error {
+	by := actor(c)
+	d, err := h.svc.Get(c.Request.Context(), by.ID, by.Admin, id)
 	if err != nil {
 		return err
 	}

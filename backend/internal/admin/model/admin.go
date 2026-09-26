@@ -56,6 +56,12 @@ type ListQuery struct {
 	Offset int
 }
 
+// UserInput is what an admin can change on a profile (R-ADMIN-6). The email
+// is the login identity and stays as it is.
+type UserInput struct {
+	DisplayName string `json:"display_name"`
+}
+
 type BanInput struct {
 	Reason string `json:"reason"` // optional, shown to the owner and other admins
 }
@@ -65,4 +71,5 @@ var (
 	ErrBanAdmin  = apperr.New(apperr.Conflict, "R-ADMIN-5", "admins can't be banned; remove their admin rights in the database first")
 	ErrBadStatus = apperr.InvalidInput("status must be active or banned")
 	ErrReason    = apperr.InvalidInput("reason must be at most 500 characters")
+	ErrName      = apperr.InvalidInput("display name must be 1 to 80 characters")
 )

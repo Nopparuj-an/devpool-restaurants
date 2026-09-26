@@ -11,7 +11,7 @@ func RegisterRoutes(api *gin.RouterGroup, h *Handler) {
 	api.GET("/restaurants", web.Handle(h.List))
 	api.GET("/restaurants/:id", web.Handle(h.Get))
 
-	owner := api.Group("", auth.RequireLogin()) // ownership is checked in the service (R-REST-2)
+	owner := api.Group("", auth.RequireLogin()) // owner or admin, checked in the service (R-REST-2, R-ADMIN-6)
 	owner.GET("/me/restaurants", web.Handle(h.Mine))
 	owner.POST("/restaurants", web.Handle(h.Create))
 	owner.PUT("/restaurants/:id", web.Handle(h.Update))

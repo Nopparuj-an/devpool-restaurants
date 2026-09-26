@@ -21,6 +21,7 @@ type Repository interface {
 	// LockUser locks the account row and returns it; apperr.ErrNotFound if missing.
 	LockUser(ctx context.Context, id int64) (model.User, error)
 	SetUserBan(ctx context.Context, id int64, at *time.Time, reason string) error
+	SetDisplayName(ctx context.Context, id int64, name string) error // apperr.ErrNotFound if missing
 	DeleteSessions(ctx context.Context, accountID int64) error
 	// ReviewedRestaurants lists restaurants the account has reviewed.
 	ReviewedRestaurants(ctx context.Context, accountID int64) ([]int64, error)
@@ -38,6 +39,8 @@ type TxRunner interface {
 type Service interface {
 	ListUsers(ctx context.Context, q model.ListQuery) ([]model.User, int, error)
 	GetUser(ctx context.Context, id int64) (model.UserDetail, error)
+	// UpdateUser edits another user's profile (R-ADMIN-6).
+	UpdateUser(ctx context.Context, id int64, in model.UserInput) (model.User, error)
 	BanUser(ctx context.Context, admin, id int64, reason string) (model.User, error)
 	UnbanUser(ctx context.Context, admin, id int64) (model.User, error)
 	ListRestaurants(ctx context.Context, q model.ListQuery) ([]model.Restaurant, int, error)
@@ -86,6 +89,17 @@ func (s *service) GetUser(ctx context.Context, id int64) (model.UserDetail, erro
 	}
 	owned, err := s.repo.OwnedRestaurants(ctx, id)
 	return model.UserDetail{User: u, OwnedRestaurants: owned}, err
+}
+
+func (s *service) UpdateUser(ctx context.Context, id int64, in model.UserInput) (model.User, error) {
+	name := strings.TrimSpace(in.DisplayName)
+	if n := utf8.RuneCountInString(name); n < 1 || n > 80 {
+		return model.User{}, model.ErrName
+	}
+	if err := s.repo.SetDisplayName(ctx, id, name); err != nil {
+		return model.User{}, err
+	}
+	return s.repo.User(ctx, id)
 }
 
 // BanUser suspends an account (R-ADMIN-3): it can't log in, its sessions end

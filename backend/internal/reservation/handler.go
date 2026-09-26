@@ -130,7 +130,8 @@ func (h *Handler) ListForOwner(c *gin.Context) error {
 	if !to.After(from) || to.Sub(from) > 31*24*time.Hour {
 		return apperr.InvalidInput("range must be positive and at most 31 days")
 	}
-	list, err := h.svc.ListForOwner(c.Request.Context(), auth.MustAccount(c).ID, id, from, to)
+	me, admin := auth.Viewer(c)
+	list, err := h.svc.ListForOwner(c.Request.Context(), me, admin, id, from, to)
 	if err != nil {
 		return err
 	}
