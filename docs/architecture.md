@@ -15,10 +15,10 @@ Next.js (App Router)      ── /api/*  rewrite ──▶  Go API  ──▶  P
 ```
 
 - **Same origin:** Next.js rewrites `/api/*` to the Go service, so the browser only ever talks to one origin. The session cookie stays `SameSite=Lax; HttpOnly` with no CORS setup. *(proposed)*
-- **Go API:** `net/http` with Go 1.22+ routing (or chi), `pgx` for Postgres, SQL migrations (goose or golang-migrate). *(proposed)*
+- **Go API:** stdlib `net/http` routing, `pgx` for Postgres, embedded `goose` migrations. The rules engine is `backend/internal/booking` (pure functions, no I/O).
 - **PostgreSQL:** relational data, the transactions and row locks used for booking, and `timestamptz`.
 - **Garage:** S3-compatible object storage for images. See [ADR-0005](decisions/0005-garage-object-storage.md).
-- **Deployment:** everything runs from one `docker compose up` in `deployment/`, with a seed step for demo data.
+- **Local dev ([ADR-0009](decisions/0009-dev-stack-and-local-infra.md)):** `make env && make up && make garage-init` starts Postgres and Garage with data bind-mounted in `deployment/data/`. `make api` runs the Go API on the host.
 
 ## Authentication ([ADR-0002](decisions/0002-go-native-auth.md))
 

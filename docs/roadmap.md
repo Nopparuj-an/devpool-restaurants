@@ -3,9 +3,10 @@
 Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they land.
 
 ## M0 — Foundation (26–28 Sep)
-- [ ] UI design in Claude Design: list, detail + booking, my reservations, my restaurants (CRUD), owner bookings, login
-- [ ] `deployment/docker-compose.yml`: Postgres, Garage (+ init script), API, web
-- [ ] Go skeleton: config, router, migrations, error format (see [architecture](architecture.md#api-conventions))
+- [ ] UI design as React components under the `/design` route: gallery + frame previews (ADR-0008): list, detail + booking, my reservations, my restaurants (CRUD), owner bookings, login
+- [ ] Ask instructors whether `design/` is acceptable instead of Claude Design/Lovable
+- [x] `deployment/docker-compose.yml`: Postgres, Garage (+ init script), bind mounts in `deployment/data/`
+- [x] Go skeleton: config, router, migrations, error format (see [architecture](architecture.md#api-conventions))
 - [ ] Auth: password signup/login/logout, sessions, `me` endpoint
 - [ ] Next.js skeleton: `/api` rewrite, session-aware layout
 
@@ -17,8 +18,8 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 - [ ] Public list + detail pages
 
 ## M2 — Booking engine (1–4 Oct) ← most important
-- [ ] `peakLoad()` pure func + table tests (brief examples, back-to-back, edit excludes self)
-- [ ] Shift resolution + overnight tests
+- [x] `PeakLoad()` pure func + table tests (brief examples, back-to-back, edit excludes self)
+- [x] Shift expansion/merge + overnight/24h tests; `CheckNew/CheckEdit/CheckCancel` rules
 - [ ] Create / edit / cancel with row lock (ADR-0003), cutoff rules, 30-day horizon, shrink exception (R-EDIT-3)
 - [ ] Concurrency integration test (N goroutines, exactly one wins)
 - [ ] My reservations page; booking form with 15-min pickers

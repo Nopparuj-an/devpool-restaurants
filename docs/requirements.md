@@ -14,7 +14,7 @@
 |---|---|
 | Frontend | **Next.js** (required), for both owner and customer screens |
 | Backend | **Go** (required). Booking rules must be checked in Go. The frontend may check them too, but never only there. |
-| UI design | **Claude Design** or Lovable (required). Design first, then build in Next.js |
+| UI design | **Claude Design** or Lovable (required). Design first, then build in Next.js. ⚠️ We use in-repo React components instead, see [ADR-0008](decisions/0008-design-as-react-components.md) |
 | DB, login, libraries | Free choice, but we must be able to explain why |
 | Docker, CI/CD | Optional. The app must run, and the README must explain how |
 
@@ -44,7 +44,7 @@ Suggestions from the brief: Limited Seats Left badge, owner view of the restaura
 
 1. **Git repo**: Next.js + Go code, plus a README with run instructions, **test accounts**, and **seed data** so restaurants and bookings show up right away.
 2. **Video**, 5 minutes max: demo every feature and explain the key code, especially the seat-capacity check.
-3. **UI design**: Claude Design link or screenshots.
+3. **UI design**: Claude Design link or screenshots. We submit screenshots of `design/` ([ADR-0008](decisions/0008-design-as-react-components.md)).
 
 ## Interview format
 
