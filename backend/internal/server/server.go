@@ -12,6 +12,7 @@ import (
 	"restaurants/internal/httpx"
 	"restaurants/internal/reservation"
 	"restaurants/internal/restaurant"
+	"restaurants/internal/review"
 	"restaurants/internal/storage"
 )
 
@@ -30,6 +31,7 @@ func New(db *pgxpool.Pool, opts Options) http.Handler {
 	authHandler.Register(mux)
 	restaurant.NewHandler(restaurant.NewService(db, opts.Images, opts.ImageBaseURL)).Register(mux)
 	reservation.NewHandler(reservation.NewService(db, opts.ImageBaseURL)).Register(mux)
+	review.NewHandler(review.NewService(db)).Register(mux)
 
 	mux.Handle("GET /api/healthz", httpx.Handler(func(w http.ResponseWriter, r *http.Request) error {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)

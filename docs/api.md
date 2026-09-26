@@ -47,3 +47,13 @@ Image URLs are relative (`/images/restaurants/…`). Next.js rewrites `/images/*
 **Reservation:** `{id, pax, starts_at, ends_at, status: active|cancelled, state: upcoming|in_progress|completed|cancelled, modifiable_until, can_modify, restaurant: {id, name, cover_url}, customer?}`.
 
 Timestamps in query strings must be URL-encoded (`+07:00` → `%2B07:00`), or just send UTC `Z` times.
+
+## Reviews
+| Method | Path | Body / query | Returns |
+|---|---|---|---|
+| GET | `/restaurants/{id}/reviews` | `?limit=&offset=` | `{reviews}`, most recently updated first |
+| GET 🔒 | `/restaurants/{id}/reviews/me` | – | My Review, or `404` |
+| PUT 🔒 | `/restaurants/{id}/reviews/me` | `{rating 1-5, body}` | `201` when created, `200` when updated (one per account, R-REVIEW-2). `403 R-REVIEW-3` on your own restaurant |
+| DELETE 🔒 | `/restaurants/{id}/reviews/me` | – | `204` |
+
+**Review:** `{id, rating, body, verified, author: {id, display_name, email?}, created_at, updated_at}`. `email` is only present for the restaurant's owner (R-PRIV-2).

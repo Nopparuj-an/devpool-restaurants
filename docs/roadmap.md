@@ -26,8 +26,8 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 - [ ] My reservations page; booking form with 15-min pickers (frontend)
 
 ## M3 — Reviews (5–6 Oct)
-- [ ] Upsert / edit / delete review, owner forbidden, verified badge
-- [ ] Aggregate columns + Bayesian sort (ADR-0004); Highest rated / Most reviewed
+- [x] Upsert / edit / delete review, owner forbidden, verified badge (API)
+- [x] Aggregate columns + Bayesian sort (ADR-0004); Highest rated / Most reviewed
 
 ## M4 — Polish & extras (7–9 Oct)
 - [ ] Google OAuth (ADR-0002) incl. password drop on link + set-new-password — after password auth is solid
