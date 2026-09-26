@@ -8,8 +8,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthInput } from "@/components/app/auth-form";
 import type { BookingInput } from "@/components/app/booking-panel";
 import type { PhotoItem, RestaurantInput } from "@/components/app/restaurant-form";
+import { BanDialog, type BanTarget } from "@/components/app/admin";
 import {
   AccountScreen,
+  AdminRestaurantsScreen,
+  AdminUserScreen,
+  AdminUsersScreen,
   AuthScreen,
   HomeScreen,
   MyBookingsScreen,
@@ -22,6 +26,10 @@ import { dayKey, dayRange, upcomingDays } from "@/lib/days";
 import { BOOKINGS_PAGE_SIZE, REVIEWS_PAGE_SIZE } from "@/lib/paging";
 import type {
   Account,
+  AdminRestaurant,
+  AdminStatus,
+  AdminUser,
+  AdminUserDetail,
   Availability,
   Reservation,
   RestaurantDetail,
@@ -136,7 +144,11 @@ export function RestaurantPage({
     router.refresh();
   }
 
+  const [banTarget, setBanTarget] = useState<BanTarget | null>(null);
+  const ban = useBanAction();
+
   return (
+    <>
     <RestaurantScreen
       // A different timezone after hydration means different day keys.
       key={tz}
@@ -154,7 +166,17 @@ export function RestaurantPage({
       onDeleteReview={onDeleteReview}
       editing={editing}
       initialDay={editing ? dayKey(new Date(editing.starts_at), tz) : undefined}
+      onAdminBan={setBanTarget}
     />
+    <BanDialog
+      target={banTarget}
+      onClose={() => setBanTarget(null)}
+      onConfirm={async (t, reason) => {
+        await ban(t, reason);
+        setBanTarget(null);
+      }}
+    />
+    </>
   );
 }
 
@@ -347,4 +369,56 @@ export function AuthPage({
     return {};
   }
   return <AuthScreen mode={mode} googleEnabled={googleEnabled} error={error} next={next} onSubmit={onSubmit} />;
+}
+
+// Calls the admin ban / unban endpoint for a user or restaurant, then refreshes.
+function useBanAction() {
+  const router = useRouter();
+  return useCallback(
+    async (t: BanTarget, reason: string) => {
+      const base = t.kind === "user" ? `/admin/users/${t.id}` : `/admin/restaurants/${t.id}`;
+      const res = t.banned ? await api("POST", `${base}/unban`) : await api("POST", `${base}/ban`, { reason });
+      if (res.error) window.alert(res.error);
+      router.refresh();
+    },
+    [router],
+  );
+}
+
+// ?q=&status=&page= for an admin list; changing search or status restarts at page 1.
+function useAdminNav(base: string, query: string, status: AdminStatus) {
+  const router = useRouter();
+  const href = useCallback(
+    (p: { query?: string; status?: AdminStatus; page?: number }) => {
+      const q = new URLSearchParams();
+      const nextQuery = p.query ?? query;
+      const nextStatus = p.status ?? status;
+      if (nextQuery) q.set("q", nextQuery);
+      if (nextStatus) q.set("status", nextStatus);
+      if (p.page && p.page > 1) q.set("page", String(p.page));
+      return q.size ? `${base}?${q}` : base;
+    },
+    [base, query, status],
+  );
+  return {
+    onQuery: useCallback((q: string) => router.replace(href({ query: q })), [router, href]),
+    onStatus: (s: AdminStatus) => router.push(href({ status: s })),
+    hrefForPage: (page: number) => href({ page }),
+  };
+}
+
+type AdminListPage = { account: Account; total: number; query: string; status: AdminStatus; page: number };
+
+export function AdminUsersPage({ users, ...p }: AdminListPage & { users: AdminUser[] }) {
+  const nav = useAdminNav("/admin/users", p.query, p.status);
+  return <AdminUsersScreen {...p} {...nav} users={users} onBan={useBanAction()} />;
+}
+
+export function AdminRestaurantsPage({ restaurants, ...p }: AdminListPage & { restaurants: AdminRestaurant[] }) {
+  const nav = useAdminNav("/admin/restaurants", p.query, p.status);
+  return <AdminRestaurantsScreen {...p} {...nav} restaurants={restaurants} onBan={useBanAction()} />;
+}
+
+export function AdminUserPage({ account, user }: { account: Account; user: AdminUserDetail }) {
+  return <AdminUserScreen account={account} user={user} onBan={useBanAction()} />;
 }

@@ -13,6 +13,7 @@ const nav = [
 
 export function SiteHeader({ account, current }: { account: Account | null; current?: string }) {
   const router = useRouter();
+  const links = account?.is_admin ? [...nav, { href: "/admin", label: "Admin" }] : nav;
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     router.push("/");
@@ -26,7 +27,7 @@ export function SiteHeader({ account, current }: { account: Account | null; curr
           Restaurants
         </Link>
         <nav className="hidden gap-1 sm:flex">
-          {nav.map((n) => (
+          {links.map((n) => (
             <Link
               key={n.href}
               href={n.href}
@@ -69,7 +70,7 @@ export function SiteHeader({ account, current }: { account: Account | null; curr
       </div>
       {/* Phone: nav moves to a second, scrollable row. */}
       <nav className="flex gap-1 overflow-x-auto border-t border-line px-2 sm:hidden">
-        {nav.map((n) => (
+        {links.map((n) => (
           <Link
             key={n.href}
             href={n.href}

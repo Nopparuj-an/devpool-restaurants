@@ -3,6 +3,9 @@
 // fixed date so previews look the same every time.
 import type {
   Account,
+  AdminRestaurant,
+  AdminUser,
+  AdminUserDetail,
   Availability,
   Hours,
   Reservation,
@@ -32,6 +35,7 @@ export const account: Account = {
   display_name: "Alice",
   email_verified: false,
   has_password: true,
+  is_admin: false,
 };
 
 // Signed up with Google and never set a password.
@@ -41,6 +45,7 @@ export const googleAccount: Account = {
   display_name: "Nok",
   email_verified: true,
   has_password: false,
+  is_admin: false,
 };
 
 export const owner: Account = {
@@ -49,6 +54,7 @@ export const owner: Account = {
   display_name: "Somchai",
   email_verified: true,
   has_password: true,
+  is_admin: false,
 };
 
 export const restaurants: RestaurantDetail[] = [
@@ -299,3 +305,40 @@ export const ownerReservations: Reservation[] = [
   restaurant: ref(restaurants[0]),
   customer: customer(3 + i, name as string),
 }));
+
+export const admin: Account = {
+  id: 7,
+  email: "admin@example.com",
+  display_name: "Admin",
+  email_verified: false,
+  has_password: true,
+  is_admin: true,
+};
+
+const ago = (days: number) => bkk(-days, "10:00");
+
+export const adminUsers: AdminUser[] = [
+  { id: 12, email: "spammer@example.com", display_name: "Best Deals 4 U", is_admin: false, banned_at: ago(1), ban_reason: "Posted ads as reviews", created_at: ago(2), restaurants: 0, reviews: 14, reservations: 0 },
+  { id: 9, email: "nok@gmail.com", display_name: "Nok", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(5), restaurants: 0, reviews: 2, reservations: 3 },
+  { id: 7, email: "admin@example.com", display_name: "Admin", is_admin: true, banned_at: null, ban_reason: "", created_at: ago(20), restaurants: 0, reviews: 0, reservations: 0 },
+  { id: 2, email: "malee@example.com", display_name: "Malee", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(30), restaurants: 2, reviews: 0, reservations: 0 },
+  { id: 1, email: "somchai@example.com", display_name: "Somchai", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(31), restaurants: 3, reviews: 0, reservations: 1 },
+];
+
+export const adminRestaurants: AdminRestaurant[] = restaurants.map((r, i) => ({
+  id: r.id,
+  name: r.name,
+  cuisine: r.cuisine,
+  location: r.location,
+  rating: r.rating,
+  review_count: r.review_count,
+  banned_at: i === 3 ? ago(1) : null,
+  ban_reason: i === 3 ? "Photos are from another restaurant" : "",
+  created_at: ago(30 - i),
+  owner: { id: r.owner.id, display_name: r.owner.display_name, email: `${r.owner.display_name.toLowerCase()}@example.com`, banned: false },
+}));
+
+export const adminUserDetail: AdminUserDetail = {
+  ...adminUsers[4],
+  owned_restaurants: adminRestaurants.filter((r) => r.owner.id === 1),
+};

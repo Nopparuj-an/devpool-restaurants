@@ -14,6 +14,7 @@ const googleErrors: Record<string, string> = {
   google_denied: "Google sign-in was cancelled.",
   google_email_unverified: "Your Google account's email isn't verified yet.",
   google_conflict: "This email is linked to a different Google account.",
+  account_banned: "This account has been suspended.",
 };
 
 export function AuthForm({

@@ -12,6 +12,9 @@ export type RestaurantSummary = {
   review_count: number;
   cover_url: string;
   owner: Owner;
+  // Only the owner and admins ever see hidden restaurants (R-ADMIN-3, -4).
+  banned?: boolean;
+  owner_banned?: boolean;
 };
 
 export type Hours = { weekday: number; open: string; close: string };
@@ -27,6 +30,7 @@ export type RestaurantDetail = RestaurantSummary & {
   images: RestaurantImage[];
   is_owner: boolean;
   upcoming_reservations?: number;
+  ban_reason?: string;
 };
 
 export type Slot = { start: string; seats_left: number; limited: boolean };
@@ -69,6 +73,7 @@ export type Account = {
   display_name: string;
   email_verified: boolean;
   has_password: boolean;
+  is_admin: boolean;
 };
 
 export type SortKey = "top_rated" | "most_reviewed" | "newest";
@@ -77,3 +82,33 @@ export type SortKey = "top_rated" | "most_reviewed" | "newest";
 export type RestaurantPage = { restaurants: RestaurantSummary[]; total: number };
 export type ReviewPage = { reviews: Review[]; total: number };
 export type ReservationPage = { reservations: Reservation[]; total: number };
+
+// Admin (R-ADMIN-*)
+export type AdminUser = {
+  id: number;
+  email: string;
+  display_name: string;
+  is_admin: boolean;
+  banned_at: string | null;
+  ban_reason: string;
+  created_at: string;
+  restaurants: number;
+  reviews: number;
+  reservations: number;
+};
+
+export type AdminRestaurant = {
+  id: number;
+  name: string;
+  cuisine: string;
+  location: string;
+  rating: number | null;
+  review_count: number;
+  banned_at: string | null;
+  ban_reason: string;
+  created_at: string;
+  owner: { id: number; display_name: string; email: string; banned: boolean };
+};
+
+export type AdminUserDetail = AdminUser & { owned_restaurants: AdminRestaurant[] };
+export type AdminStatus = "" | "active" | "banned";

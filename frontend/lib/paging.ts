@@ -3,3 +3,4 @@
 export const HOME_PAGE_SIZE = 24;
 export const REVIEWS_PAGE_SIZE = 20;
 export const BOOKINGS_PAGE_SIZE = 50;
+export const ADMIN_PAGE_SIZE = 25;

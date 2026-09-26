@@ -4,7 +4,9 @@
 //
 // It signs up a throwaway account, books, changes and cancels a table,
 // reviews a restaurant, creates and edits a restaurant with photo uploads,
-// then deletes the restaurant and review it made. The throwaway account and its
+// then deletes the restaurant and review it made. With an admin account
+// (E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD, default admin@example.com /
+// password123) it also bans and unbans that user and restaurant. The throwaway account and its
 // cancelled booking stay (the API has no account deletion). Failure screenshots go to $E2E_SHOTS
 // (default: a temp dir).
 import { spawn } from "node:child_process";
@@ -74,6 +76,8 @@ const HELPERS = `
     return true;
   };
   const text = () => norm(document.body.innerText);
+  const tableText = () => norm(document.querySelector("table")?.innerText);
+  const rowButton = (label) => { const b = [...document.querySelectorAll("table button")].find((x) => norm(x.textContent) === label); if (!b) throw new Error("no row button: " + label); b.click(); };
   const waitFor = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { try { const v = fn(); if (v) return v; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("timeout waiting for: " + fn.toString()); };
 `;
 async function go(path) { await send("Page.navigate", { url: `http://localhost:3000${path}` }); await sleep(1800); }
@@ -98,7 +102,9 @@ try {
     if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") problems.push("console: " + m.params.args.map((a) => a.value ?? a.description).join(" ").slice(0, 200));
   });
   await send("Runtime.enable"); await send("Page.enable"); await send("DOM.enable");
-  const email = `e2e${Date.now()}@example.com`;
+  const stamp = Date.now();
+  const email = `e2e${stamp}@example.com`;
+  const kitchen = `E2E Kitchen ${stamp}`; // unique, so searches never match an older run
 
   await step("sign up", async () => {
     await go("/signup");
@@ -167,16 +173,16 @@ try {
   let newId;
   await step("create a restaurant with a photo", async () => {
     await go("/me/restaurants/new");
-    await evaluate(`fill("Name", "E2E Kitchen"); fill("Cuisine", "Thai"); fill("Location", "Test Street"); fill("Description", "Made by the end-to-end test."); fill("Seats", "8");
+    await evaluate(`fill("Name", "${kitchen}"); fill("Cuisine", "Thai"); fill("Location", "Test Street"); fill("Description", "Made by the end-to-end test."); fill("Seats", "8");
       [...document.querySelectorAll('input[type=checkbox]')].forEach((c) => { if (!c.checked) c.click(); });`);
     const { root } = await send("DOM.getDocument");
     const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: 'input[type=file]' });
     await send("DOM.setFileInputFiles", { nodeId, files: [BIG_PHOTO, PHOTO] });
     await evaluate(`await waitFor(() => document.querySelectorAll('img[src^="blob:"]').length === 2); click("Create restaurant", "button");
-      await waitFor(() => /^\\/restaurants\\/\\d+$/.test(location.pathname) && text().includes("E2E Kitchen"), 10000);`);
+      await waitFor(() => /^\\/restaurants\\/\\d+$/.test(location.pathname) && text().includes("${kitchen}"), 10000);`);
     newId = await evaluate(`return location.pathname.split("/").pop()`);
     await shot("created");
-    const cover = await evaluate(`return document.querySelector('img[alt="E2E Kitchen"]')?.src ?? ""`);
+    const cover = await evaluate(`return document.querySelector('img[alt="${kitchen}"]')?.src ?? ""`);
     if (!cover.endsWith(".jpg")) throw new Error("big photo was not resized to JPEG: " + cover);
     return `id ${newId}, cover resized to ${cover.split(".").pop()}`;
   });
@@ -193,6 +199,65 @@ try {
   await step("owner bookings page", async () => {
     await go(`/me/restaurants/${newId}/bookings`);
     return evaluate(`await waitFor(() => text().includes("No bookings yet for this day") || text().includes("Closed on this day")); return "empty state shown"`);
+  });
+
+  const adminEmail = process.env.E2E_ADMIN_EMAIL ?? "admin@example.com";
+  const adminPassword = process.env.E2E_ADMIN_PASSWORD ?? "password123";
+  let asAdmin = false;
+  await step("admin: log in", async () => {
+    await evaluate(`await fetch("/api/auth/logout", { method: "POST" })`);
+    await go("/login");
+    await evaluate(`fill("Email", "${adminEmail}"); fill("Password", "${adminPassword}"); click("Log in", "button[type=submit]");
+      await waitFor(() => location.pathname === "/" && text().includes("Admin"));`);
+    asAdmin = true;
+  });
+
+  if (asAdmin) {
+    await step("admin: find the user and ban them", async () => {
+      await go(`/admin/users?q=${email}`);
+      await evaluate(`await waitFor(() => text().includes("${email}")); click("Eve K.", "a");
+        await waitFor(() => text().includes("Restaurants they own") && text().includes("${kitchen}"));
+        click("Ban user", "button"); await waitFor(() => document.querySelector("dialog[open] textarea"));
+        const ta = document.querySelector("dialog[open] textarea");
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(ta, "e2e check");
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+        [...document.querySelectorAll("dialog[open] button")].find((b) => b.textContent.trim() === "Ban").click();
+        await waitFor(() => text().includes("Banned") && text().includes("e2e check"));`);
+      const status = await evaluate(`return (await fetch("/api/restaurants/${newId}")).status`);
+      await shot("admin-user-banned");
+      return `admin can still open their restaurant: ${status}`;
+    });
+
+    await step("admin: banned user can't log in", async () => {
+      const res = await evaluate(`const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "${email}", password: "password456" }) }); return r.status + " " + (await r.json()).error.code`);
+      if (!res.startsWith("403 account_banned")) throw new Error(res);
+      return res;
+    });
+  }
+
+  await step("admin: unban user, ban and unban restaurant", async () => {
+    if (!asAdmin) return "skipped";
+    await go(`/admin/users?q=${email}`);
+    await evaluate(`await waitFor(() => text().includes("${email}")); rowButton("Unban");
+      await waitFor(() => document.querySelector("dialog[open]"));
+      [...document.querySelectorAll("dialog[open] button")].find((b) => b.textContent.trim() === "Unban").click();
+      await waitFor(() => tableText().includes("Active") && !tableText().includes("Banned"));`);
+    await go(`/admin/restaurants?q=${encodeURIComponent(kitchen)}`);
+    await evaluate(`await waitFor(() => text().includes("${kitchen}")); rowButton("Ban");
+      await waitFor(() => document.querySelector("dialog[open]"));
+      [...document.querySelectorAll("dialog[open] button")].find((b) => b.textContent.trim() === "Ban").click();
+      await waitFor(() => tableText().includes("Banned"));`);
+    await shot("admin-restaurants");
+    const hidden = await evaluate(`const r = await fetch("/api/restaurants?q=${encodeURIComponent(kitchen)}"); return (await r.json()).restaurants.some((x) => x.id === ${newId})`);
+    if (hidden) throw new Error("banned restaurant still in public search");
+    await evaluate(`rowButton("Unban"); await waitFor(() => document.querySelector("dialog[open]"));
+      [...document.querySelectorAll("dialog[open] button")].find((b) => b.textContent.trim() === "Unban").click();
+      await waitFor(() => tableText().includes("Active") && !tableText().includes("Banned"));`);
+    await evaluate(`await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "${email}", password: "password456" }) })`);
+    return "hidden from public search while banned; back to the owner";
   });
 
   await step("clean up", async () => {

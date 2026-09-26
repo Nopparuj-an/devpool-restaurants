@@ -7,6 +7,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { PasswordForm, ProfileForm } from "@/components/app/account-forms";
+import {
+  AdminFilters,
+  AdminTabs,
+  BanDialog,
+  RestaurantTable,
+  StatusBadge,
+  UserTable,
+  type BanTarget,
+} from "@/components/app/admin";
 import { AuthForm, type AuthInput } from "@/components/app/auth-form";
 import { BookingPanel, DayTabs, type BookingInput } from "@/components/app/booking-panel";
 import { LoadStrip, OwnerTable } from "@/components/app/owner-table";
@@ -16,14 +25,18 @@ import { RestaurantForm, type PhotoItem, type RestaurantInput } from "@/componen
 import { Gallery, HoursList } from "@/components/app/restaurant-info";
 import { ReviewForm, ReviewItem } from "@/components/app/reviews";
 import { Page, PageTitle, SiteHeader } from "@/components/app/site-header";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { ConfirmDialog, Segmented } from "@/components/ui/controls";
 import { Input } from "@/components/ui/field";
-import { EmptyState, Photo, Rating } from "@/components/ui/misc";
+import { Badge, EmptyState, Notice, Photo, Rating } from "@/components/ui/misc";
 import { Pagination, ShowMore } from "@/components/ui/pagination";
 import * as fmt from "@/lib/format";
 import type {
   Account,
+  AdminRestaurant,
+  AdminStatus,
+  AdminUser,
+  AdminUserDetail,
   Availability,
   Reservation,
   RestaurantDetail,
@@ -31,7 +44,7 @@ import type {
   Review,
   SortKey,
 } from "@/lib/types";
-import { HOME_PAGE_SIZE } from "@/lib/paging";
+import { ADMIN_PAGE_SIZE, HOME_PAGE_SIZE } from "@/lib/paging";
 import { useTimeZone } from "@/lib/use-time-zone";
 
 type Result = Promise<{ error?: string }>;
@@ -133,9 +146,12 @@ export function RestaurantScreen({
   initialDay,
   reviewsTotal,
   onMoreReviews,
+  onAdminBan,
 }: {
   account: Account | null;
   restaurant: RestaurantDetail;
+  // Admins get ban / unban here too (R-ADMIN-4).
+  onAdminBan?: (target: BanTarget) => void;
   reviews: Review[];
   // All reviews count; `reviews` may be the first page only.
   reviewsTotal?: number;
@@ -157,6 +173,31 @@ export function RestaurantScreen({
       <SiteHeader account={account} current="/" />
       <Page>
         <div className="flex flex-col gap-8">
+          {(r.banned || r.owner_banned) && (
+            <Notice tone="warning">
+              <span className="font-medium">Hidden from customers.</span>{" "}
+              {r.banned
+                ? `An admin banned this restaurant${r.ban_reason ? `: ${r.ban_reason}` : "."}`
+                : "The owner's account is suspended."}
+            </Notice>
+          )}
+          {account?.is_admin && onAdminBan && !r.is_owner && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line px-4 py-3 text-sm">
+              <span className="text-muted">Admin</span>
+              <span className="flex gap-2">
+                <ButtonLink size="sm" variant="secondary" href={`/admin/users/${r.owner.id}`}>
+                  Owner
+                </ButtonLink>
+                <Button
+                  size="sm"
+                  variant={r.banned ? "secondary" : "danger"}
+                  onClick={() => onAdminBan({ kind: "restaurant", id: r.id, name: r.name, banned: !!r.banned })}
+                >
+                  {r.banned ? "Unban restaurant" : "Ban restaurant"}
+                </Button>
+              </span>
+            </div>
+          )}
           {r.is_owner && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-accent-soft px-4 py-3 text-sm">
               <span>
@@ -360,9 +401,12 @@ export function MyRestaurantsScreen({ account, restaurants }: { account: Account
               <div key={r.id} className="flex flex-wrap items-center gap-4 p-4">
                 <Photo src={r.cover_url} className="size-16 shrink-0 rounded-lg" />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <Link href={`/restaurants/${r.id}`} className="truncate font-medium hover:text-accent">
-                    {r.name}
-                  </Link>
+                  <span className="flex items-center gap-2">
+                    <Link href={`/restaurants/${r.id}`} className="truncate font-medium hover:text-accent">
+                      {r.name}
+                    </Link>
+                    {r.banned && <Badge tone="danger">Hidden by an admin</Badge>}
+                  </span>
                   <Rating value={r.rating} count={r.review_count} />
                 </div>
                 <div className="flex gap-2">
@@ -504,6 +548,134 @@ export function AuthScreen({
         <div className="pt-4 sm:pt-10">
           <AuthForm mode={mode} googleEnabled={googleEnabled} error={error} next={next} onSubmit={onSubmit} />
         </div>
+      </Page>
+    </>
+  );
+}
+
+type AdminListProps = {
+  account: Account;
+  total: number;
+  query: string;
+  status: AdminStatus;
+  page: number;
+  onQuery: (q: string) => void;
+  onStatus: (s: AdminStatus) => void;
+  hrefForPage: (page: number) => string;
+  onBan: (target: BanTarget, reason: string) => Promise<void>;
+};
+
+// One ban dialog per screen; tables only say which row was clicked.
+function useBan(onBan: (target: BanTarget, reason: string) => Promise<void>) {
+  const [target, setTarget] = useState<BanTarget | null>(null);
+  const dialog = (
+    <BanDialog
+      target={target}
+      onClose={() => setTarget(null)}
+      onConfirm={async (t, reason) => {
+        await onBan(t, reason);
+        setTarget(null);
+      }}
+    />
+  );
+  return { open: setTarget, dialog };
+}
+
+export function AdminUsersScreen({ users, ...p }: AdminListProps & { users: AdminUser[] }) {
+  const ban = useBan(p.onBan);
+  return (
+    <>
+      <SiteHeader account={p.account} current="/admin" />
+      <Page>
+        <PageTitle title="Admin" subtitle={`${p.total.toLocaleString("en")} ${p.total === 1 ? "user" : "users"}`} />
+        <AdminTabs current="users" />
+        <AdminFilters query={p.query} status={p.status} placeholder="Search by name or email" onQuery={p.onQuery} onStatus={p.onStatus} />
+        {users.length === 0 ? <EmptyState title="No users match" /> : <UserTable users={users} onBan={ban.open} />}
+        <Pagination page={p.page} pageCount={Math.ceil(p.total / ADMIN_PAGE_SIZE)} hrefFor={p.hrefForPage} />
+        {ban.dialog}
+      </Page>
+    </>
+  );
+}
+
+export function AdminRestaurantsScreen({ restaurants, ...p }: AdminListProps & { restaurants: AdminRestaurant[] }) {
+  const ban = useBan(p.onBan);
+  return (
+    <>
+      <SiteHeader account={p.account} current="/admin" />
+      <Page>
+        <PageTitle title="Admin" subtitle={`${p.total.toLocaleString("en")} ${p.total === 1 ? "restaurant" : "restaurants"}`} />
+        <AdminTabs current="restaurants" />
+        <AdminFilters query={p.query} status={p.status} placeholder="Search by name, cuisine or owner email" onQuery={p.onQuery} onStatus={p.onStatus} />
+        {restaurants.length === 0 ? <EmptyState title="No restaurants match" /> : <RestaurantTable restaurants={restaurants} onBan={ban.open} />}
+        <Pagination page={p.page} pageCount={Math.ceil(p.total / ADMIN_PAGE_SIZE)} hrefFor={p.hrefForPage} />
+        {ban.dialog}
+      </Page>
+    </>
+  );
+}
+
+export function AdminUserScreen({
+  account,
+  user,
+  onBan,
+}: {
+  account: Account;
+  user: AdminUserDetail;
+  onBan: (target: BanTarget, reason: string) => Promise<void>;
+}) {
+  const ban = useBan(onBan);
+  const tz = useTimeZone();
+  const stats = [
+    ["Restaurants", user.restaurants],
+    ["Reviews", user.reviews],
+    ["Bookings", user.reservations],
+  ] as const;
+  return (
+    <>
+      <SiteHeader account={account} current="/admin" />
+      <Page>
+        <Link href="/admin/users" className="mb-4 inline-block text-sm text-muted hover:text-accent">
+          ← All users
+        </Link>
+        <PageTitle
+          title={user.display_name}
+          subtitle={`${user.email} · joined ${fmt.day(user.created_at, tz)}`}
+          action={
+            !user.is_admin &&
+            user.id !== account.id && (
+              <Button
+                variant={user.banned_at ? "secondary" : "danger"}
+                onClick={() => ban.open({ kind: "user", id: user.id, name: user.display_name, banned: !!user.banned_at })}
+              >
+                {user.banned_at ? "Unban user" : "Ban user"}
+              </Button>
+            )
+          }
+        />
+        <div className="mb-10 flex flex-wrap items-center gap-6">
+          <StatusBadge bannedAt={user.banned_at} admin={user.is_admin} />
+          {stats.map(([label, n]) => (
+            <span key={label} className="text-sm">
+              <span className="font-semibold tabular-nums">{n}</span> <span className="text-muted">{label.toLowerCase()}</span>
+            </span>
+          ))}
+        </div>
+        {user.banned_at && (
+          <div className="mb-10">
+            <Notice tone="danger">
+              Banned {fmt.day(user.banned_at, tz)}
+              {user.ban_reason ? `: ${user.ban_reason}` : "."} Their restaurants and reviews are hidden.
+            </Notice>
+          </div>
+        )}
+        <h2 className="mb-4 font-semibold">Restaurants they own</h2>
+        {user.owned_restaurants.length === 0 ? (
+          <EmptyState title="No restaurants" />
+        ) : (
+          <RestaurantTable restaurants={user.owned_restaurants} onBan={ban.open} showOwner={false} />
+        )}
+        {ban.dialog}
       </Page>
     </>
   );

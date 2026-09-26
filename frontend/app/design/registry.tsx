@@ -5,6 +5,9 @@ import { useCallback, useState } from "react";
 
 import {
   AccountScreen,
+  AdminRestaurantsScreen,
+  AdminUserScreen,
+  AdminUsersScreen,
   AuthScreen,
   HomeScreen,
   MyBookingsScreen,
@@ -77,6 +80,24 @@ function Restaurant({ asOwner, anonymous, editing }: { asOwner?: boolean; anonym
   );
 }
 
+// The owner's view of a restaurant an admin banned.
+function HiddenRestaurant() {
+  const loadAvailability = useCallback(async (day: string) => mock.availability(Number(day)), []);
+  return (
+    <RestaurantScreen
+      account={mock.owner}
+      restaurant={{ ...mock.ownedRestaurant, banned: true, ban_reason: "Photos are from another restaurant" }}
+      reviews={mock.reviews}
+      days={DAYS.slice(1)}
+      now={mock.MOCK_NOW}
+      loadAvailability={loadAvailability}
+      onBook={ok}
+      onSaveReview={ok}
+      onDeleteReview={done}
+    />
+  );
+}
+
 function OwnerBookings() {
   const [day, setDay] = useState("1");
   const d = Number(day);
@@ -118,6 +139,42 @@ const screens = {
     render: () => <RestaurantEditorScreen account={mock.owner} restaurant={mock.ownedRestaurant} onSave={ok} onDelete={done} />,
   },
   "owner-bookings": { render: () => <OwnerBookings /> },
+  "admin-users": {
+    render: () => (
+      <AdminUsersScreen
+        account={mock.admin}
+        users={mock.adminUsers}
+        total={mock.adminUsers.length}
+        query=""
+        status=""
+        page={1}
+        onQuery={() => {}}
+        onStatus={() => {}}
+        hrefForPage={() => "#"}
+        onBan={done}
+      />
+    ),
+  },
+  "admin-user": { render: () => <AdminUserScreen account={mock.admin} user={mock.adminUserDetail} onBan={done} /> },
+  "admin-restaurants": {
+    render: () => (
+      <AdminRestaurantsScreen
+        account={mock.admin}
+        restaurants={mock.adminRestaurants}
+        total={mock.adminRestaurants.length}
+        query=""
+        status=""
+        page={1}
+        onQuery={() => {}}
+        onStatus={() => {}}
+        hrefForPage={() => "#"}
+        onBan={done}
+      />
+    ),
+  },
+  "restaurant-hidden": {
+    render: () => <HiddenRestaurant />,
+  },
   account: { render: () => <AccountScreen account={mock.account} onSaveName={ok} onSetPassword={ok} /> },
   "account-google": { render: () => <AccountScreen account={mock.googleAccount} onSaveName={ok} onSetPassword={ok} /> },
   login: { render: () => <AuthScreen mode="login" googleEnabled onSubmit={ok} /> },
