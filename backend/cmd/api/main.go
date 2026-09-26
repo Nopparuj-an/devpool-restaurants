@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	_ "time/tzdata" // embed tz database so LoadLocation works in slim images (ADR-0007)
@@ -19,10 +20,34 @@ import (
 )
 
 func main() {
+	// `api healthcheck` is for container healthchecks: the distroless image has no curl.
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		os.Exit(healthcheck())
+	}
 	if err := run(); err != nil {
 		slog.Error("fatal", "err", err)
 		os.Exit(1)
 	}
+}
+
+func healthcheck() int {
+	addr := os.Getenv("HTTP_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+	if strings.HasPrefix(addr, ":") {
+		addr = "127.0.0.1" + addr
+	}
+	client := http.Client{Timeout: 3 * time.Second}
+	res, err := client.Get("http://" + addr + "/api/healthz")
+	if err != nil {
+		return 1
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 func run() error {

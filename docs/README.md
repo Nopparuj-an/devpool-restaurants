@@ -22,7 +22,7 @@ This wiki is the source of truth for humans and coding agents. If the code and t
 ```
 backend/     Go API (booking rules in internal/booking)
 frontend/    Next.js app (incl. /design gallery, ADR-0008)
-deployment/  docker compose, Garage config, .env, bind-mounted data/
+deployment/  compose files (infra + app, ADR-0010), Garage config, .env, bind-mounted data/
 docs/        this wiki
 ```
 

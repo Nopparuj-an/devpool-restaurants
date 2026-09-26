@@ -13,3 +13,4 @@ One file per decision: `NNNN-short-title.md`. Each has a Status (`Proposed` | `A
 | [0007](0007-time-storage-and-overnight-hours.md) | UTC everywhere, browser-local display, overnight/24h shifts | Accepted |
 | [0008](0008-design-as-react-components.md) | UI design as in-repo React components, not Claude Design/Lovable | Accepted (risk noted) |
 | [0009](0009-dev-stack-and-local-infra.md) | Dev stack & local infra (stdlib router, pgx, goose, compose bind mounts) | Accepted |
+| [0010](0010-containers.md) | API/web images; app compose separate from infra | Accepted |

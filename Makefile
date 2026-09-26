@@ -1,8 +1,9 @@
 # Restaurants — dev tasks. Run `make help`.
 COMPOSE := docker compose -f deployment/docker-compose.yml
+APP_COMPOSE := docker compose -f deployment/docker-compose.app.yml
 ENV_FILE := deployment/.env
 
-.PHONY: help env up down ps logs garage-init psql api seed test fmt vet
+.PHONY: help env up down ps logs garage-init psql api seed test fmt vet app-up app-down app-logs app-seed
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -52,3 +53,15 @@ fmt: ## gofmt backend
 
 vet: ## go vet backend
 	cd backend && go vet ./...
+
+app-up: ## Build + start API and web containers (needs `make up`); web on :3000
+	$(APP_COMPOSE) up -d --build --wait
+
+app-down: ## Stop API and web containers
+	$(APP_COMPOSE) down
+
+app-logs: ## Tail API and web logs
+	$(APP_COMPOSE) logs -f
+
+app-seed: ## Load demo data using the API image (no-op if already seeded)
+	$(APP_COMPOSE) run --rm --no-deps --entrypoint /seed api

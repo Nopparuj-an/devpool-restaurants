@@ -1,0 +1,45 @@
+name: restaurants-app
+
+# App containers: Go API + Next.js web. Separate from the infra
+# (docker-compose.yml) so each can be started and stopped on its own.
+# Start the infra first (`make up`); this joins its network to reach
+# `postgres` and `garage` by name.
+#
+#   make app-up     build + start, web on http://localhost:3000
+#   make app-seed   load demo data through the API image
+
+services:
+  api:
+    build: ../backend
+    image: restaurants-api
+    restart: unless-stopped
+    env_file: .env # S3 keys, Google client, …
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      S3_ENDPOINT: http://garage:3900
+      # Plain http on localhost. Set "true" when served over HTTPS.
+      COOKIE_SECURE: "false"
+    # Not published: the browser reaches the API through the web app's /api rewrite.
+    networks: [infra]
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        API_URL: http://api:8080
+        IMAGES_URL: http://restaurant-images.web.garage.localhost:3902
+    image: restaurants-web
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8080 # server-side fetches at request time
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [infra]
+
+networks:
+  infra:
+    name: restaurants_default # created by docker-compose.yml
+    external: true

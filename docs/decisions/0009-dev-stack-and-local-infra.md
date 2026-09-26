@@ -13,4 +13,4 @@
 ## Consequences
 - Resetting all data is `make down && rm -rf deployment/data`.
 - Ports are bound to 127.0.0.1 only: 5432 (Postgres), 3900 (S3 API), 3902 (public images), 8080 (API).
-- Containerizing the API and web app for the final submission is optional (see requirements). Decide in M4.
+- The API and web app containers are covered by [ADR-0010](0010-containers.md).

@@ -18,4 +18,7 @@ make garage-init  # first time: Garage layout, key, bucket, website mode
 make seed         # demo data (no-op if already seeded)
 make api          # run Go API on :8080 (applies migrations)
 make test         # backend tests
+make app-up       # API + web in containers (web on :3000); app compose is separate from infra
 ```
+
+Frontend: `cd frontend && pnpm dev`. Next.js 16 differs from older versions; read `frontend/AGENTS.md` first.

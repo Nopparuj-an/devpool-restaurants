@@ -4,23 +4,38 @@ A restaurant reservation and review community built for the PEA DevPool 2026 fin
 
 - **Backend:** Go (stdlib `net/http`, pgx, goose), PostgreSQL 18
 - **Images:** Garage (S3-compatible), served publicly
-- **Frontend:** Next.js *(in progress)*
+- **Frontend:** Next.js 16 *(UI in progress; the current page is only a wiring check)*
 
 Design notes, business rules and decisions live in **[docs/](docs/README.md)**.
 
-## Run it locally
+## Run it
 
-Requirements: Docker (with Compose), Go 1.26+, `make`, `openssl`.
+### With Docker only
+
+Requirements: Docker (with Compose), `make`, `openssl`.
 
 ```sh
 make env          # create deployment/.env with random secrets (first time only)
-make up           # start Postgres + Garage; data is kept in deployment/data/
+make up           # infra: Postgres + Garage; data is kept in deployment/data/
 make garage-init  # create the image bucket (first time only)
-make seed         # demo accounts, restaurants, bookings, reviews
-make api          # API on http://localhost:8080 (applies migrations on start)
+make app-up       # build + start the API and web containers
+make app-seed     # demo accounts, restaurants, bookings, reviews
 ```
 
-Check it: `curl localhost:8080/api/restaurants`. Endpoints are listed in [docs/api.md](docs/api.md).
+Open **http://localhost:3000**. The infra and the app are separate compose files (`deployment/docker-compose.yml` and `deployment/docker-compose.app.yml`), so `make app-down` stops only the app.
+
+### For development (hot reload)
+
+Additional requirements: Go 1.27+, Node 24 with pnpm (`corepack enable`).
+
+```sh
+make env && make up && make garage-init   # same infra as above
+make seed                                 # demo data
+make api                                  # API on http://localhost:8080
+cd frontend && pnpm install && pnpm dev   # web on http://localhost:3000
+```
+
+Endpoints are listed in [docs/api.md](docs/api.md).
 
 To start over, run `make down && rm -rf deployment/data`, then repeat the steps above from `make up`.
 
@@ -55,6 +70,6 @@ make test
 ```
 backend/     Go API; booking rules in internal/booking (pure, no I/O)
 frontend/    Next.js app (in progress)
-deployment/  docker compose, Garage config, .env, bind-mounted data/
+deployment/  compose files (infra + app), Garage config, .env, bind-mounted data/
 docs/        wiki: requirements, domain rules, architecture, ADRs, API
 ```
