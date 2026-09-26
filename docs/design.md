@@ -47,4 +47,18 @@ UI text follows the humanizer rules: sentence case everywhere, plain words, no e
 
 ## Checking a change
 
-Screens are checked at 390 and 1280 wide for horizontal overflow and console errors. A headless Edge driven over the DevTools protocol takes the screenshots. The script isn't in the repo yet. Add it under `frontend/scripts/` if this becomes routine.
+- `pnpm e2e` (in `frontend/`, with `make up`, `make api` and `pnpm dev` running) drives the real app in headless Chrome or Edge. It signs up, books, changes and cancels a table, writes a review, creates and edits a restaurant with photo uploads, checks the owner bookings page, and logs out. It fails on any console error, then cleans up after itself.
+- Screens were also checked at 390 and 1280 wide for horizontal overflow.
+
+## Pages
+
+| Route | Screen | Data |
+|---|---|---|
+| `/` | HomeScreen | `?sort=` is passed through to the API |
+| `/restaurants/[id]` | RestaurantScreen | `?edit=<reservation>` switches the booking panel to "Change booking" |
+| `/me/reservations` | MyBookingsScreen | login required |
+| `/me/restaurants`, `/me/restaurants/new` | MyRestaurantsScreen, RestaurantEditorScreen | login required |
+| `/me/restaurants/[id]/edit`, `/bookings` | RestaurantEditorScreen, OwnerBookingsScreen | owner only, otherwise 404 |
+| `/login`, `/signup` | AuthScreen | `?next=` (same-site paths only), `?error=` from Google |
+
+Each route is a small server component (`app/**/page.tsx`) that loads data with `lib/api-server.ts`, forwarding the session cookie. It then renders a client wrapper from `components/pages/pages.tsx`, which owns the router and API calls (`lib/api-client.ts`, through the `/api` rewrite). Pages that need a login redirect to `/login?next=…`.

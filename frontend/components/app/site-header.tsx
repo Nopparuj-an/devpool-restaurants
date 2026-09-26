@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import type { Account } from "@/lib/types";
 
@@ -9,6 +12,12 @@ const nav = [
 ];
 
 export function SiteHeader({ account, current }: { account: Account | null; current?: string }) {
+  const router = useRouter();
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    router.push("/");
+    router.refresh(); // re-render server components logged out
+  }
   return (
     <header className="border-b border-line bg-white">
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4 sm:px-6">
@@ -30,12 +39,24 @@ export function SiteHeader({ account, current }: { account: Account | null; curr
         </nav>
         <div className="ml-auto text-sm">
           {account ? (
-            <span className="flex items-center gap-2">
-              <span className="flex size-7 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent">
-                {account.display_name.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="hidden sm:inline">{account.display_name}</span>
-            </span>
+            <details className="group relative">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-1 py-1 hover:bg-surface [&::-webkit-details-marker]:hidden">
+                <span className="flex size-7 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent">
+                  {account.display_name.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="hidden sm:inline">{account.display_name}</span>
+              </summary>
+              <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-line bg-white p-1 shadow-sm">
+                <p className="truncate px-3 py-2 text-xs text-muted">{account.email}</p>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-surface"
+                >
+                  Log out
+                </button>
+              </div>
+            </details>
           ) : (
             <Link href="/login" className="font-medium text-accent hover:text-accent-hover">
               Log in

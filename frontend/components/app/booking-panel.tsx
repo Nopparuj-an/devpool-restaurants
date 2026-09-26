@@ -24,14 +24,17 @@ type Props = {
   onSubmit: (input: BookingInput) => Promise<{ error?: string }>;
   // When set, the panel edits this reservation instead of creating one.
   editing?: Reservation;
+  // Day selected at first (defaults to the first of `days`).
+  initialDay?: string;
   now: string;
 };
 
 // Start times are offered only when every 15-minute slot the booking would
 // cover has room for the party (the same rule the API enforces, R-BOOK-5).
-export function BookingPanel({ seats, maxMinutes, cutoffMinutes, days, loadAvailability, onSubmit, editing, now }: Props) {
+export function BookingPanel({ seats, maxMinutes, cutoffMinutes, days, loadAvailability, onSubmit, editing, initialDay, now }: Props) {
   const tz = useTimeZone();
-  const [dayKey, setDayKey] = useState(days[0]?.key ?? "");
+  const [dayKey, setDayKey] = useState(initialDay ?? days[0]?.key ?? "");
+  const [reload, setReload] = useState(0);
   const [pax, setPax] = useState(editing?.pax ?? 2);
   const initialMinutes = editing ? (Date.parse(editing.ends_at) - Date.parse(editing.starts_at)) / 60000 : 60;
   const [minutes, setMinutes] = useState(Math.min(initialMinutes, maxMinutes));
@@ -46,7 +49,7 @@ export function BookingPanel({ seats, maxMinutes, cutoffMinutes, days, loadAvail
     return () => {
       live = false;
     };
-  }, [dayKey, loadAvailability]);
+  }, [dayKey, loadAvailability, reload]);
 
   // Seats left per slot, giving back the seats of the booking being edited
   // so it doesn't block itself (R-EDIT-2).
@@ -87,6 +90,10 @@ export function BookingPanel({ seats, maxMinutes, cutoffMinutes, days, loadAvail
       ends_at: new Date(chosen.t + minutes * 60000).toISOString(),
     });
     setBusy(false);
+    if (!res.error) {
+      setStart(null);
+      setReload((n) => n + 1); // show the seats this booking just took
+    }
     setStatus(
       res.error
         ? { tone: "danger", text: res.error }

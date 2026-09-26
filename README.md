@@ -4,7 +4,7 @@ A restaurant reservation and review community built for the PEA DevPool 2026 fin
 
 - **Backend:** Go (stdlib `net/http`, pgx, goose), PostgreSQL 18
 - **Images:** Garage (S3-compatible), served publicly
-- **Frontend:** Next.js 16 *(UI in progress; the current page is only a wiring check)*
+- **Frontend:** Next.js 16. The design gallery is at `/design`
 
 Design notes, business rules and decisions live in **[docs/](docs/README.md)**.
 
@@ -64,12 +64,13 @@ make test
 
 - Pure rule tests: `backend/internal/booking` (capacity sweep, opening hours incl. overnight and 24h, edit and cancel rules).
 - API integration tests run against a throwaway database on the compose Postgres, one per test. They include the brief's seat examples and a lock test that fails if the booking row lock is removed.
+- UI: `cd frontend && pnpm e2e` drives the real app in headless Chrome or Edge (sign up, book, change, cancel, review, create and edit a restaurant, log out). It needs the dev setup running.
 
 ## Layout
 
 ```
 backend/     Go API; booking rules in internal/booking (pure, no I/O)
-frontend/    Next.js app (in progress)
+frontend/    Next.js app; screens in components/screens, design gallery at /design
 deployment/  compose files (infra + app), Garage config, .env, bind-mounted data/
 docs/        wiki: requirements, domain rules, architecture, ADRs, API
 ```

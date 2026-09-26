@@ -30,6 +30,13 @@ const MAX_LENGTHS = [60, 90, 120, 180, 240, 360];
 
 type DayRow = { open: boolean; from: string; to: string };
 
+// A photo in the form: either already stored (id) or picked just now (file).
+export type PhotoItem = { key: string; url: string; isCover: boolean; id?: number; file?: File };
+
+const MAX_PHOTOS = 10;
+const MAX_BYTES = 5 * 1024 * 1024;
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 function toRows(hours: Hours[]): DayRow[] {
   return [0, 1, 2, 3, 4, 5, 6].map((d) => {
     const h = hours.find((x) => x.weekday === d);
@@ -58,7 +65,7 @@ export function RestaurantForm({
 }: {
   initial?: RestaurantDetail;
   images?: RestaurantImage[];
-  onSave: (input: RestaurantInput, images: RestaurantImage[]) => Promise<{ error?: string }>;
+  onSave: (input: RestaurantInput, photos: PhotoItem[]) => Promise<{ error?: string }>;
   onDelete?: () => Promise<void>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -69,7 +76,10 @@ export function RestaurantForm({
   const [cutoff, setCutoff] = useState(initial?.cancel_cutoff_minutes ?? 30);
   const [maxLength, setMaxLength] = useState(initial?.max_reservation_minutes ?? 240);
   const [rows, setRows] = useState<DayRow[]>(toRows(initial?.hours ?? []));
-  const [images, setImages] = useState<RestaurantImage[]>(initialImages);
+  const [images, setImages] = useState<PhotoItem[]>(() =>
+    initialImages.map((img) => ({ key: `img-${img.id}`, url: img.url, isCover: img.is_cover, id: img.id })),
+  );
+  const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
 
@@ -80,11 +90,32 @@ export function RestaurantForm({
     const hours = rows.flatMap((r, weekday) => (r.open ? [{ weekday, open: r.from, close: r.to }] : []));
     if (hours.length === 0) return setMessage({ tone: "danger", text: "Open at least one day a week." });
     if (images.length === 0) return setMessage({ tone: "danger", text: "Add at least one photo." });
+    setSaving(true);
+    setMessage(null);
     const res = await onSave(
       { name, description, cuisine, location, seats, cancel_cutoff_minutes: cutoff, max_reservation_minutes: maxLength, hours },
       images,
     );
+    setSaving(false);
     setMessage(res.error ? { tone: "danger", text: res.error } : { tone: "success", text: "Saved." });
+  }
+
+  function addFiles(files: FileList | null) {
+    if (!files) return;
+    const picked = Array.from(files);
+    const bad = picked.find((f) => !PHOTO_TYPES.includes(f.type) || f.size > MAX_BYTES);
+    if (bad) return setMessage({ tone: "danger", text: `${bad.name} must be a JPEG, PNG or WebP under 5 MB.` });
+    setMessage(null);
+    setImages((xs) => {
+      const room = MAX_PHOTOS - xs.length;
+      const added = picked.slice(0, room).map((file, i) => ({
+        key: `new-${crypto.randomUUID()}`,
+        url: URL.createObjectURL(file),
+        isCover: xs.length === 0 && i === 0,
+        file,
+      }));
+      return [...xs, ...added];
+    });
   }
 
   const hintFor = (r: DayRow) =>
@@ -112,16 +143,16 @@ export function RestaurantForm({
       <Section title="Photos" hint="The first photo is the cover. Up to 10, JPEG, PNG or WebP, 5 MB each.">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {images.map((img, i) => (
-            <div key={img.id} className="group relative">
+            <div key={img.key} className="group relative">
               <Photo src={img.url} className="aspect-square w-full rounded-lg" />
-              {img.is_cover ? (
+              {img.isCover ? (
                 <span className="absolute left-1.5 top-1.5">
                   <Badge tone="accent">Cover</Badge>
                 </span>
               ) : (
                 <button
                   type="button"
-                  onClick={() => setImages((xs) => xs.map((x) => ({ ...x, is_cover: x.id === img.id })))}
+                  onClick={() => setImages((xs) => xs.map((x) => ({ ...x, isCover: x.key === img.key })))}
                   className="absolute left-1.5 top-1.5 hidden items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-xs group-hover:flex"
                 >
                   <Star className="size-3" /> Make cover
@@ -133,8 +164,8 @@ export function RestaurantForm({
                 disabled={images.length === 1}
                 onClick={() =>
                   setImages((xs) => {
-                    const left = xs.filter((x) => x.id !== img.id);
-                    if (img.is_cover && left[0]) left[0] = { ...left[0], is_cover: true };
+                    const left = xs.filter((x) => x.key !== img.key);
+                    if (img.isCover && left[0]) left[0] = { ...left[0], isCover: true };
                     return left;
                   })
                 }
@@ -148,7 +179,16 @@ export function RestaurantForm({
             <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line text-sm text-muted transition-colors hover:border-accent hover:text-accent">
               <ImagePlus className="size-5" />
               Add photos
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" />
+              <input
+                type="file"
+                accept={PHOTO_TYPES.join(",")}
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
             </label>
           )}
         </div>
@@ -223,7 +263,9 @@ export function RestaurantForm({
       </Section>
 
       <div className="flex flex-wrap items-center gap-3 pt-8">
-        <Button onClick={save}>{initial ? "Save changes" : "Create restaurant"}</Button>
+        <Button onClick={save} disabled={saving}>
+          {saving ? "Saving…" : initial ? "Save changes" : "Create restaurant"}
+        </Button>
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
         {initial && onDelete && (
           <Button variant="danger" className="ml-auto" onClick={() => setConfirmDelete(true)}>

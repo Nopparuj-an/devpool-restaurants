@@ -11,7 +11,7 @@ import { BookingPanel, DayTabs, type BookingInput } from "@/components/app/booki
 import { LoadStrip, OwnerTable } from "@/components/app/owner-table";
 import { ReservationCard } from "@/components/app/reservation-card";
 import { RestaurantCard } from "@/components/app/restaurant-card";
-import { RestaurantForm, type RestaurantInput } from "@/components/app/restaurant-form";
+import { RestaurantForm, type PhotoItem, type RestaurantInput } from "@/components/app/restaurant-form";
 import { Gallery, HoursList } from "@/components/app/restaurant-info";
 import { ReviewForm, ReviewItem } from "@/components/app/reviews";
 import { Page, PageTitle, SiteHeader } from "@/components/app/site-header";
@@ -25,7 +25,6 @@ import type {
   Availability,
   Reservation,
   RestaurantDetail,
-  RestaurantImage,
   RestaurantSummary,
   Review,
   SortKey,
@@ -103,6 +102,7 @@ export function RestaurantScreen({
   onSaveReview,
   onDeleteReview,
   editing,
+  initialDay,
 }: {
   account: Account | null;
   restaurant: RestaurantDetail;
@@ -115,6 +115,7 @@ export function RestaurantScreen({
   onSaveReview: (input: { rating: number; body: string }) => Result;
   onDeleteReview: () => Promise<void>;
   editing?: Reservation;
+  initialDay?: string;
 }) {
   const others = reviews.filter((rv) => rv.id !== myReview?.id);
   return (
@@ -162,6 +163,7 @@ export function RestaurantScreen({
                 loadAvailability={loadAvailability}
                 onSubmit={onBook}
                 editing={editing}
+                initialDay={initialDay}
               />
             </aside>
 
@@ -324,7 +326,7 @@ export function RestaurantEditorScreen({
 }: {
   account: Account;
   restaurant?: RestaurantDetail;
-  onSave: (input: RestaurantInput, images: RestaurantImage[]) => Result;
+  onSave: (input: RestaurantInput, photos: PhotoItem[]) => Result;
   onDelete?: () => Promise<void>;
 }) {
   return (
@@ -346,6 +348,7 @@ export function OwnerBookingsScreen({
   onDay,
   reservations,
   openWindow,
+  loading,
 }: {
   account: Account;
   restaurant: RestaurantDetail;
@@ -355,6 +358,7 @@ export function OwnerBookingsScreen({
   reservations: Reservation[];
   // Opening hours of the selected day, for the load chart.
   openWindow: { from: string; to: string } | null;
+  loading?: boolean;
 }) {
   const booked = reservations.filter((r) => r.status === "active");
   return (
@@ -373,7 +377,12 @@ export function OwnerBookingsScreen({
         <div className="mb-6 overflow-x-auto">
           <DayTabs days={days} value={day} onChange={onDay} />
         </div>
-        {!openWindow ? (
+        {loading ? (
+          <div className="flex flex-col gap-8" aria-busy>
+            <div className="h-28 animate-pulse rounded-lg bg-surface" />
+            <div className="h-48 animate-pulse rounded-xl bg-surface" />
+          </div>
+        ) : !openWindow ? (
           <EmptyState title="Closed on this day" />
         ) : booked.length === 0 ? (
           <EmptyState title="No bookings yet for this day" />
@@ -392,11 +401,13 @@ export function AuthScreen({
   mode,
   googleEnabled,
   error,
+  next,
   onSubmit,
 }: {
   mode: "login" | "signup";
   googleEnabled: boolean;
   error?: string;
+  next?: string;
   onSubmit: (input: AuthInput) => Result;
 }) {
   return (
@@ -404,7 +415,7 @@ export function AuthScreen({
       <SiteHeader account={null} />
       <Page narrow>
         <div className="pt-4 sm:pt-10">
-          <AuthForm mode={mode} googleEnabled={googleEnabled} error={error} onSubmit={onSubmit} />
+          <AuthForm mode={mode} googleEnabled={googleEnabled} error={error} next={next} onSubmit={onSubmit} />
         </div>
       </Page>
     </>

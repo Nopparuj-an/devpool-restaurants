@@ -20,11 +20,13 @@ export function AuthForm({
   mode,
   googleEnabled,
   error: initialError,
+  next = "/",
   onSubmit,
 }: {
   mode: "login" | "signup";
   googleEnabled: boolean;
   error?: string;
+  next?: string;
   onSubmit: (input: AuthInput) => Promise<{ error?: string }>;
 }) {
   const [email, setEmail] = useState("");
@@ -53,7 +55,7 @@ export function AuthForm({
 
       {googleEnabled && (
         <>
-          <a href="/api/auth/google/start" className={buttonClass({ variant: "secondary" }, "w-full")}>
+          <a href={`/api/auth/google/start?next=${encodeURIComponent(next)}`} className={buttonClass({ variant: "secondary" }, "w-full")}>
             <GoogleMark />
             Continue with Google
           </a>
@@ -92,7 +94,7 @@ export function AuthForm({
 
       <p className="text-center text-sm text-muted">
         {signup ? "Already have an account? " : "New here? "}
-        <Link href={signup ? "/login" : "/signup"} className="font-medium text-accent hover:text-accent-hover">
+        <Link href={`${signup ? "/login" : "/signup"}${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`} className="font-medium text-accent hover:text-accent-hover">
           {signup ? "Log in" : "Create an account"}
         </Link>
       </p>
