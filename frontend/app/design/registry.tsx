@@ -4,6 +4,7 @@
 import { useCallback, useState } from "react";
 
 import {
+  AccountScreen,
   AuthScreen,
   HomeScreen,
   MyBookingsScreen,
@@ -31,10 +32,27 @@ export const DAYS = ["Today", "Tomorrow", "Sat 3", "Sun 4", "Mon 5", "Tue 6", "W
 
 function Home() {
   const [sort, setSort] = useState<SortKey>("top_rated");
-  const sorted = [...mock.summaries].sort((a, b) =>
-    sort === "most_reviewed" ? b.review_count - a.review_count : sort === "newest" ? b.id - a.id : (b.rating ?? 0) - (a.rating ?? 0),
+  const [query, setQuery] = useState("");
+  const q = query.toLowerCase();
+  const sorted = [...mock.summaries]
+    .filter((r) => !q || r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q))
+    .sort((a, b) =>
+      sort === "most_reviewed" ? b.review_count - a.review_count : sort === "newest" ? b.id - a.id : (b.rating ?? 0) - (a.rating ?? 0),
+    );
+  return (
+    <HomeScreen
+      account={mock.account}
+      restaurants={sorted}
+      total={sorted.length}
+      sort={sort}
+      query={query}
+      page={1}
+      onSort={setSort}
+      onQuery={setQuery}
+      hrefForPage={() => "#"}
+      limitedIds={[1]}
+    />
   );
-  return <HomeScreen account={mock.account} restaurants={sorted} sort={sort} onSort={setSort} limitedIds={[1]} />;
 }
 
 function Restaurant({ asOwner, anonymous, editing }: { asOwner?: boolean; anonymous?: boolean; editing?: boolean }) {
@@ -100,6 +118,8 @@ const screens = {
     render: () => <RestaurantEditorScreen account={mock.owner} restaurant={mock.ownedRestaurant} onSave={ok} onDelete={done} />,
   },
   "owner-bookings": { render: () => <OwnerBookings /> },
+  account: { render: () => <AccountScreen account={mock.account} onSaveName={ok} onSetPassword={ok} /> },
+  "account-google": { render: () => <AccountScreen account={mock.googleAccount} onSaveName={ok} onSetPassword={ok} /> },
   login: { render: () => <AuthScreen mode="login" googleEnabled onSubmit={ok} /> },
   signup: { render: () => <AuthScreen mode="signup" googleEnabled onSubmit={ok} /> },
 } satisfies Record<ScreenName, { render: () => React.ReactNode }>;

@@ -52,6 +52,7 @@ backend/
       routes.go  handler.go  module.go  model/ service/ repository/
     platform/                shared plumbing, no business rules
       apperr/                errors with a Kind (NotFound, Conflict, …), no HTTP
+      imageproc/             shrink photos to ≤1600 px JPEG, reject decompression bombs
       web/                   Gin helpers: Kind → status code, JSON decode, path IDs
       database/              pool, migrations/, WithinTx + Conn (transaction in ctx)
       storage/               S3 (Garage) image store + in-memory fake
@@ -90,7 +91,8 @@ backend/
 | How an error kind maps to a status code | `platform/web/web.go` |
 | Cookies, sessions, who is logged in | `auth/middleware.go`, `auth/handler.go` |
 | Wiring a new feature in | its `module.go`, then one line in `server/server.go` |
-| Demo data | `cmd/seed/main.go` |
+| Demo data | `cmd/seed/main.go`; bulk load data in `cmd/seed/bulk.go` |
+| How photos are resized | `platform/imageproc` (server), `frontend/lib/image.ts` (browser) |
 
 ## Endpoints → code
 
@@ -99,7 +101,7 @@ backend/
 | `POST /auth/signup`, `/auth/login`, `/auth/logout` | `auth/handler.go` `Signup`, `Login`, `Logout` | `auth` `Signup`, `Login`, `CreateSession`, `DeleteSession` |
 | `GET /auth/providers` | `auth/handler.go` `Providers` | none |
 | `GET /auth/google/start`, `/auth/google/callback` | `auth/google_handler.go` | `auth` `LoginWithGoogle` |
-| `GET /me`, `PUT /me/password` | `auth/handler.go` `Me`, `SetPassword` | `auth` `SetPassword` |
+| `GET /me`, `PUT /me`, `PUT /me/password` | `auth/handler.go` `Me`, `UpdateProfile`, `SetPassword` | `auth` `UpdateProfile`, `SetPassword` |
 | `GET /restaurants`, `GET /restaurants/:id` | `restaurant/handler.go` `List`, `Get` | `restaurant` `List`, `Get` |
 | `POST`, `PUT`, `DELETE /restaurants[/:id]`, `GET /me/restaurants` | `restaurant/handler.go` `Create`, `Update`, `Delete`, `Mine` | `restaurant` same names |
 | `POST /restaurants/:id/images`, `DELETE …/images/:imageID`, `PUT …/cover` | `restaurant/image_handler.go` | `restaurant` `AddImages`, `DeleteImage`, `SetCover` |
@@ -132,3 +134,29 @@ Request and response shapes are in [api.md](api.md).
 - **Handlers** have the signature `func(c *gin.Context) error` and are wrapped with `web.Handle` in `routes.go`.
 - **The logged-in account** comes from `auth.MustAccount(c)` behind `RequireLogin`, or `auth.ViewerID(c)` on public routes (0 = visitor).
 - **Tests.** Pure rules: `booking/booking_test.go`. Each feature's API: `<feature>/<feature>_test.go` (real HTTP and DB, run with `make test`). Google linking: `auth/service/auth_service_test.go`.
+
+## Scaling
+
+**Every list is paged or bounded.** Restaurants, reviews and my bookings take `limit`/`offset` and return `total`. The restaurant list computes its total in the same query with `count(*) OVER ()`. Availability is capped at 7 days (672 slots), the owner table at 31 days. Search (`q`, name or cuisine) runs in SQL. The web app pages the home list 24 at a time and loads reviews and past bookings with "Show more".
+
+**Indexes** (`migrations/00002_scaling_indexes.sql`): pg_trgm GIN indexes make `ILIKE '%…%'` search use an index. There are b-tree indexes for "Most reviewed", "New", and each restaurant's reviews. The booking overlap query uses `reservations_active_time_idx` from the first migration.
+
+**Measured** with `make seed-bulk N=10000` on the dev laptop, through the API (20 requests each):
+
+| Request | 1,006 restaurants | 10,006 restaurants (~50k reviews) |
+|---|---|---|
+| `/restaurants` (top rated, page 1) | p95 5.3 ms | p95 12.5 ms |
+| `/restaurants?sort=most_reviewed` | p95 6.0 ms | p95 8.8 ms |
+| `/restaurants?sort=newest&offset=9950` (last page) | p95 3.8 ms | p95 10.5 ms |
+| `/restaurants?q=sabai` (trigram index) | p95 5.0 ms | p95 4.9 ms |
+| `/restaurants/:id/reviews` | p95 3.7 ms | p95 3.8 ms |
+| `/restaurants/:id/availability` (24h) | p95 3.9 ms | p95 3.6 ms |
+
+`EXPLAIN ANALYZE` confirms the plans: search is a BitmapOr of both trigram indexes (0.7 ms), and "Most reviewed" reads 50 rows from its index (0.03 ms).
+
+**Known limits, and the next step if they matter:**
+- "Top rated" computes the Bayesian score for every row, then sorts. That's fine at 10k (12 ms). Around 100k+, store the score in a column updated with the rating totals, and index it.
+- Offset paging reads and skips earlier rows, so page 400 costs more than page 1. Keyset ("after id X") paging would fix that, at the price of no "Page N of M".
+- Photos are served straight from Garage, and the API never streams them.
+
+`make seed-bulk N=…` adds generated users, restaurants (one photo each) and about 5N reviews. `make seed-bulk-remove` removes all of it, including the photos.

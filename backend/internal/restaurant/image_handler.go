@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	maxImageBytes   = 5 << 20
+	// Per file, before server-side shrinking (imageproc). The browser shrinks
+	// photos before upload, so real uploads are usually far smaller.
+	maxImageBytes   = 10 << 20
 	maxRequestBytes = model.MaxImages*maxImageBytes + 1<<20
 )
 
@@ -103,7 +105,7 @@ func readUploads(files []*multipart.FileHeader) ([]model.Upload, error) {
 	uploads := make([]model.Upload, 0, len(files))
 	for _, fh := range files {
 		if fh.Size > maxImageBytes {
-			return nil, apperr.InvalidInput("%s is larger than 5 MB", fh.Filename)
+			return nil, apperr.InvalidInput("%s is larger than 10 MB", fh.Filename)
 		}
 		f, err := fh.Open()
 		if err != nil {

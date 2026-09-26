@@ -81,7 +81,7 @@ type Detail struct {
 
 type ListQuery struct {
 	Sort    string // "top_rated" (default) | "most_reviewed" | "newest"
-	Q       string // name contains, case-insensitive
+	Q       string // name or cuisine contains, case-insensitive
 	Cuisine string // exact, case-insensitive
 	OwnerID int64  // 0 = any
 	Limit   int

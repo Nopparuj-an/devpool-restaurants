@@ -14,5 +14,7 @@ var (
 	ErrTooManyImages = apperr.InvalidInput("at most %d images per restaurant", MaxImages)
 	ErrNoImages      = apperr.InvalidInput("no images uploaded")
 	ErrTooLarge      = apperr.New(apperr.TooLarge, "too_large", "upload too large")
+	ErrImageType     = apperr.InvalidInput("photos must be JPEG, PNG or WebP images")
+	ErrImagePixels   = apperr.InvalidInput("photo is too large (more than 40 megapixels)")
 	ErrInvalidSort   = apperr.InvalidInput("sort must be top_rated, most_reviewed or newest")
 )

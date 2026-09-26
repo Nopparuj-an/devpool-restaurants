@@ -100,11 +100,17 @@ func (r *Repository) collect(ctx context.Context, sql string, args ...any) ([]mo
 	})
 }
 
-func (r *Repository) List(ctx context.Context, restaurantID int64, now time.Time, limit, offset int) ([]model.Review, error) {
-	return r.collect(ctx, listSelect+`
+func (r *Repository) List(ctx context.Context, restaurantID int64, now time.Time, limit, offset int) ([]model.Review, int, error) {
+	q := r.db.Conn(ctx)
+	var total int
+	if err := q.QueryRow(ctx, `SELECT review_count FROM restaurants WHERE id = $1`, restaurantID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	list, err := r.collect(ctx, listSelect+`
 		WHERE rv.restaurant_id = $1
 		ORDER BY rv.updated_at DESC, rv.id DESC
 		LIMIT $3 OFFSET $4`, restaurantID, now, limit, offset)
+	return list, total, err
 }
 
 func (r *Repository) Mine(ctx context.Context, restaurantID, accountID int64, now time.Time) (model.Review, error) {

@@ -1,8 +1,11 @@
 package restaurant_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/png"
 	"net/http"
 	"strings"
 	"testing"
@@ -210,4 +213,59 @@ func TestListFilters(t *testing.T) {
 	check(names(anon, "/api/restaurants?cuisine=japanese"), "Sushi Bar")
 	check(names(alice, "/api/me/restaurants"), "Pad Thai 100%")
 	anon.Do("GET", "/api/restaurants?sort=bogus", nil).ExpectError(http.StatusUnprocessableEntity, "invalid_input")
+}
+
+func TestPaginationAndSearch(t *testing.T) {
+	env := apitest.New(t)
+	owner := env.Signup("owner@example.com", "Owner")
+	for i, cuisine := range []string{"Thai", "Japanese", "Thai"} {
+		in := apitest.RestaurantInput(fmt.Sprintf("Place %d", i), 10)
+		in["cuisine"] = cuisine
+		owner.CreateRestaurant(in)
+	}
+	type page struct {
+		Restaurants []struct{ Name string } `json:"restaurants"`
+		Total       int                     `json:"total"`
+	}
+	get := func(q string) page {
+		t.Helper()
+		var p page
+		env.Client().Do("GET", "/api/restaurants?"+q, nil).Expect(http.StatusOK).JSON(&p)
+		return p
+	}
+	if p := get("sort=newest&limit=2"); p.Total != 3 || len(p.Restaurants) != 2 || p.Restaurants[0].Name != "Place 2" {
+		t.Errorf("page 1 = %+v", p)
+	}
+	if p := get("sort=newest&limit=2&offset=2"); p.Total != 3 || len(p.Restaurants) != 1 || p.Restaurants[0].Name != "Place 0" {
+		t.Errorf("page 2 = %+v", p)
+	}
+	if p := get("limit=2&offset=10"); p.Total != 3 || len(p.Restaurants) != 0 {
+		t.Errorf("past the end = %+v", p)
+	}
+	// q searches cuisine as well as name.
+	if p := get("q=japan"); p.Total != 1 || p.Restaurants[0].Name != "Place 1" {
+		t.Errorf("q=japan = %+v", p)
+	}
+	if p := get("q=thai&limit=1"); p.Total != 2 || len(p.Restaurants) != 1 {
+		t.Errorf("q=thai = %+v", p)
+	}
+}
+
+func TestLargePhotoIsShrunk(t *testing.T) {
+	env := apitest.New(t)
+	owner := env.Signup("owner@example.com", "Owner")
+	var big bytes.Buffer
+	png.Encode(&big, image.NewRGBA(image.Rect(0, 0, 3000, 2000)))
+
+	var d detail
+	createRaw(owner, apitest.RestaurantInput("Big", 10), apitest.File{Field: "images", Name: "big.png", Data: big.Bytes()}).
+		Expect(http.StatusCreated).JSON(&d)
+	if !strings.HasSuffix(d.CoverURL, ".jpg") {
+		t.Fatalf("cover = %s, want a .jpg", d.CoverURL)
+	}
+	stored := env.Images.Objects[strings.TrimPrefix(d.CoverURL, "/images/")]
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(stored))
+	if err != nil || format != "jpeg" || cfg.Width != 1600 || cfg.Height != 1067 {
+		t.Fatalf("stored %s %dx%d err=%v", format, cfg.Width, cfg.Height, err)
+	}
 }

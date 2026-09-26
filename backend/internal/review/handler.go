@@ -33,11 +33,11 @@ func (h *Handler) List(c *gin.Context) error {
 	}
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
-	list, err := h.svc.List(c.Request.Context(), auth.ViewerID(c), id, limit, offset)
+	list, total, err := h.svc.List(c.Request.Context(), auth.ViewerID(c), id, limit, offset)
 	if err != nil {
 		return err
 	}
-	c.JSON(http.StatusOK, gin.H{"reviews": list})
+	c.JSON(http.StatusOK, gin.H{"reviews": list, "total": total})
 	return nil
 }
 

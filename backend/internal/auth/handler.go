@@ -90,6 +90,21 @@ func (h *Handler) Me(c *gin.Context) error {
 	return nil
 }
 
+func (h *Handler) UpdateProfile(c *gin.Context) error {
+	var in struct {
+		DisplayName string `json:"display_name"`
+	}
+	if err := web.Decode(c, &in); err != nil {
+		return err
+	}
+	a, err := h.svc.UpdateProfile(c.Request.Context(), MustAccount(c).ID, in.DisplayName)
+	if err != nil {
+		return err
+	}
+	c.JSON(http.StatusOK, a)
+	return nil
+}
+
 func (h *Handler) SetPassword(c *gin.Context) error {
 	var in struct {
 		CurrentPassword string `json:"current_password"`

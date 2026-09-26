@@ -72,3 +72,8 @@ export type Account = {
 };
 
 export type SortKey = "top_rated" | "most_reviewed" | "newest";
+
+// List responses carry the total number of matches for paging.
+export type RestaurantPage = { restaurants: RestaurantSummary[]; total: number };
+export type ReviewPage = { reviews: Review[]; total: number };
+export type ReservationPage = { reservations: Reservation[]; total: number };

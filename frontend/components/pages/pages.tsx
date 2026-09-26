@@ -9,6 +9,7 @@ import type { AuthInput } from "@/components/app/auth-form";
 import type { BookingInput } from "@/components/app/booking-panel";
 import type { PhotoItem, RestaurantInput } from "@/components/app/restaurant-form";
 import {
+  AccountScreen,
   AuthScreen,
   HomeScreen,
   MyBookingsScreen,
@@ -18,35 +19,68 @@ import {
 } from "@/components/screens/screens";
 import { api } from "@/lib/api-client";
 import { dayKey, dayRange, upcomingDays } from "@/lib/days";
+import { BOOKINGS_PAGE_SIZE, REVIEWS_PAGE_SIZE } from "@/lib/paging";
 import type {
   Account,
   Availability,
   Reservation,
   RestaurantDetail,
   RestaurantImage,
+  ReservationPage,
   RestaurantSummary,
   Review,
+  ReviewPage,
   SortKey,
 } from "@/lib/types";
 import { useTimeZone } from "@/lib/use-time-zone";
 
 const EMPTY: Availability = { seats: 0, limited_threshold: 2, limited: false, slots: [] };
 
-export function HomePage(props: { account: Account | null; restaurants: RestaurantSummary[]; sort: SortKey }) {
+export function HomePage(props: {
+  account: Account | null;
+  restaurants: RestaurantSummary[];
+  total: number;
+  sort: SortKey;
+  query: string;
+  page: number;
+}) {
   const router = useRouter();
-  return <HomeScreen {...props} onSort={(s) => router.push(s === "top_rated" ? "/" : `/?sort=${s}`)} />;
+  // Changing search or sort starts again at page 1.
+  const href = useCallback(
+    (p: { sort?: SortKey; query?: string; page?: number }) => {
+      const q = new URLSearchParams();
+      const sort = p.sort ?? props.sort;
+      const query = p.query ?? props.query;
+      if (sort !== "top_rated") q.set("sort", sort);
+      if (query) q.set("q", query);
+      if (p.page && p.page > 1) q.set("page", String(p.page));
+      return q.size ? `/?${q}` : "/";
+    },
+    [props.sort, props.query],
+  );
+  const onQuery = useCallback((query: string) => router.replace(href({ query })), [router, href]);
+  return (
+    <HomeScreen
+      {...props}
+      onSort={(sort) => router.push(href({ sort }))}
+      onQuery={onQuery}
+      hrefForPage={(page) => href({ page })}
+    />
+  );
 }
 
 export function RestaurantPage({
   account,
   restaurant,
-  reviews,
+  reviews: firstPage,
+  reviewsTotal,
   myReview,
   editing,
 }: {
   account: Account | null;
   restaurant: RestaurantDetail;
   reviews: Review[];
+  reviewsTotal: number;
   myReview?: Review;
   editing?: Reservation;
 }) {
@@ -55,6 +89,23 @@ export function RestaurantPage({
   const [now] = useState(() => new Date());
   const days = useMemo(() => upcomingDays(now, tz, 14), [now, tz]);
   const id = restaurant.id;
+  // First page comes from the server; "Show more" appends. A refresh (after
+  // writing a review) replaces it with the new first page.
+  const [reviews, setReviews] = useState(firstPage);
+  const [total, setTotal] = useState(reviewsTotal);
+  const [shownFirstPage, setShownFirstPage] = useState(firstPage);
+  if (firstPage !== shownFirstPage) {
+    setShownFirstPage(firstPage);
+    setReviews(firstPage);
+    setTotal(reviewsTotal);
+  }
+  async function onMoreReviews() {
+    const res = await api<ReviewPage>("GET", `/restaurants/${id}/reviews?limit=${REVIEWS_PAGE_SIZE}&offset=${reviews.length}`);
+    if (res.data) {
+      setReviews((rs) => [...rs, ...res.data!.reviews.filter((r) => !rs.some((x) => x.id === r.id))]);
+      setTotal(res.data.total);
+    }
+  }
 
   const loadAvailability = useCallback(
     async (key: string) => {
@@ -92,6 +143,8 @@ export function RestaurantPage({
       account={account}
       restaurant={restaurant}
       reviews={reviews}
+      reviewsTotal={total}
+      onMoreReviews={onMoreReviews}
       myReview={myReview}
       days={days}
       now={now.toISOString()}
@@ -105,12 +158,31 @@ export function RestaurantPage({
   );
 }
 
-export function MyBookingsPage({ account, reservations }: { account: Account; reservations: Reservation[] }) {
+export function MyBookingsPage({
+  account,
+  reservations: firstPage,
+  total,
+}: {
+  account: Account;
+  reservations: Reservation[];
+  total: number;
+}) {
   const router = useRouter();
+  const [reservations, setReservations] = useState(firstPage);
+  const [shownFirstPage, setShownFirstPage] = useState(firstPage);
+  if (firstPage !== shownFirstPage) {
+    setShownFirstPage(firstPage);
+    setReservations(firstPage);
+  }
   return (
     <MyBookingsScreen
       account={account}
       reservations={reservations}
+      total={total}
+      onMore={async () => {
+        const res = await api<ReservationPage>("GET", `/me/reservations?limit=${BOOKINGS_PAGE_SIZE}&offset=${reservations.length}`);
+        if (res.data) setReservations((rs) => [...rs, ...res.data!.reservations.filter((r) => !rs.some((x) => x.id === r.id))]);
+      }}
       onCancel={async (r) => {
         await api("POST", `/reservations/${r.id}/cancel`);
         router.refresh();
@@ -231,6 +303,26 @@ export function OwnerBookingsPage({ account, restaurant }: { account: Account; r
       reservations={current?.reservations ?? []}
       openWindow={current ? current.openWindow : { from: now.toISOString(), to: now.toISOString() }}
       loading={!current}
+    />
+  );
+}
+
+export function AccountPage({ account }: { account: Account }) {
+  const router = useRouter();
+  return (
+    <AccountScreen
+      account={account}
+      onSaveName={async (display_name) => {
+        const res = await api("PUT", "/me", { display_name });
+        if (!res.error) router.refresh(); // header shows the new name
+        return { error: res.error };
+      }}
+      onSetPassword={async (current_password, new_password) => {
+        const res = await api("PUT", "/me/password", { current_password, new_password });
+        if (res.status === 401) return { error: "Your current password is wrong." };
+        if (!res.error) router.refresh(); // has_password may have changed
+        return { error: res.error };
+      }}
     />
   );
 }

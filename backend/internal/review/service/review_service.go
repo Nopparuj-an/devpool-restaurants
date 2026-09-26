@@ -25,7 +25,7 @@ type Repository interface {
 	Update(ctx context.Context, restaurantID, accountID int64, rating int, body string) error
 	Delete(ctx context.Context, restaurantID, accountID int64) (int, error) // returns the old rating
 	AdjustAggregate(ctx context.Context, restaurantID int64, sumDelta, countDelta int) error
-	List(ctx context.Context, restaurantID int64, now time.Time, limit, offset int) ([]model.Review, error)
+	List(ctx context.Context, restaurantID int64, now time.Time, limit, offset int) ([]model.Review, int, error)
 	Mine(ctx context.Context, restaurantID, accountID int64, now time.Time) (model.Review, error) // ErrNotFound if none
 }
 
@@ -38,8 +38,9 @@ type Service interface {
 	// Upsert creates or replaces my review (R-REVIEW-2) and reports whether it was created.
 	Upsert(ctx context.Context, me, restaurantID int64, in model.Input) (bool, error)
 	Delete(ctx context.Context, me, restaurantID int64) error
-	// List returns reviews, most recently updated first; viewer is the logged-in account or 0.
-	List(ctx context.Context, viewer, restaurantID int64, limit, offset int) ([]model.Review, error)
+	// List returns one page of reviews (most recently updated first) and the
+	// total; viewer is the logged-in account or 0.
+	List(ctx context.Context, viewer, restaurantID int64, limit, offset int) ([]model.Review, int, error)
 	Mine(ctx context.Context, me, restaurantID int64) (model.Review, error)
 }
 
@@ -103,22 +104,22 @@ func (s *service) Delete(ctx context.Context, me, restaurantID int64) error {
 	})
 }
 
-func (s *service) List(ctx context.Context, viewer, restaurantID int64, limit, offset int) ([]model.Review, error) {
+func (s *service) List(ctx context.Context, viewer, restaurantID int64, limit, offset int) ([]model.Review, int, error) {
 	exists, err := s.repo.RestaurantExists(ctx, restaurantID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	if !exists {
-		return nil, apperr.ErrNotFound
+		return nil, 0, apperr.ErrNotFound
 	}
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	list, err := s.repo.List(ctx, restaurantID, s.now(), limit, max(offset, 0))
+	list, total, err := s.repo.List(ctx, restaurantID, s.now(), limit, max(offset, 0))
 	for i := range list {
 		hideEmail(&list[i], viewer)
 	}
-	return list, err
+	return list, total, err
 }
 
 func (s *service) Mine(ctx context.Context, me, restaurantID int64) (model.Review, error) {

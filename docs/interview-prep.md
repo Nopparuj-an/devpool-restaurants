@@ -23,6 +23,11 @@ The interview checks *foundation*: can you explain your own code and why. Keep a
 - Time & timezone: `timestamptz`, `time.LoadLocation`, `time/tzdata`, half-open intervals.
 - SQL & transactions: isolation level we run at (READ COMMITTED) and why the row lock makes it safe; what happens on rollback.
 
+## Scaling (1,000+ users or restaurants)
+- **How does the list scale?** Every list is paged in SQL and returns a total. Search runs in SQL on trigram indexes, not in the browser. Measured with 10,006 restaurants and ~50k reviews: every list endpoint p95 ≤ 12.5 ms (docs/backend.md#scaling).
+- **What breaks first?** "Top rated" scores every row before sorting, and deep offset pages. The fixes are a stored, indexed score column and keyset paging. Both are explained in docs/backend.md.
+- **Photos?** Resized to ≤1600 px JPEG in the browser *and* on the server, so storage per restaurant stays small whatever the client does. Decompression bombs are rejected before decoding.
+
 ## Architecture questions
 - **Why interfaces for repositories?** The service says what it needs (the port). The SQL is swappable and the rules don't depend on Postgres. Each feature's `Repository` interface doubles as a list of every query that feature runs.
 - **Where does the transaction start?** In the service (`WithinTx`). Repositories only join it through the context. The booking lock needs the lock, the overlap read, and the insert in one transaction, and only the service knows that.

@@ -97,6 +97,7 @@ func TestVerifiedAndPrivacy(t *testing.T) {
 	bob.Do("PUT", path+"/me", review(3, "Heard it's ok")).Expect(http.StatusCreated)
 
 	type list struct {
+		Total   int `json:"total"`
 		Reviews []struct {
 			Verified bool `json:"verified"`
 			Author   struct {
@@ -107,6 +108,14 @@ func TestVerifiedAndPrivacy(t *testing.T) {
 	}
 	var pub list
 	env.Client().Do("GET", path, nil).Expect(http.StatusOK).JSON(&pub)
+	if pub.Total != 2 {
+		t.Errorf("total = %d, want 2", pub.Total)
+	}
+	var one list
+	env.Client().Do("GET", path+"?limit=1&offset=1", nil).Expect(http.StatusOK).JSON(&one)
+	if len(one.Reviews) != 1 || one.Total != 2 {
+		t.Errorf("second page = %+v", one)
+	}
 	verified := map[string]bool{}
 	for _, r := range pub.Reviews {
 		verified[r.Author.DisplayName] = r.Verified

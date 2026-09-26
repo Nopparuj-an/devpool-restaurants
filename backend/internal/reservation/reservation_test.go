@@ -307,8 +307,22 @@ func TestListsAndPrivacy(t *testing.T) {
 	later := mustCreate(t, alice, id, book(2, at(3, "12:00"), at(3, "13:00")))
 	sooner := mustCreate(t, alice, id, book(2, at(2, "12:00"), at(2, "13:00")))
 
-	var mine struct{ Reservations []reservation }
+	var mine struct {
+		Reservations []reservation
+		Total        int
+	}
 	alice.Do("GET", "/api/me/reservations", nil).Expect(http.StatusOK).JSON(&mine)
+	if mine.Total != 2 {
+		t.Fatalf("total = %d, want 2", mine.Total)
+	}
+	var first struct {
+		Reservations []reservation
+		Total        int
+	}
+	alice.Do("GET", "/api/me/reservations?limit=1", nil).Expect(http.StatusOK).JSON(&first)
+	if len(first.Reservations) != 1 || first.Total != 2 || first.Reservations[0].ID != sooner {
+		t.Fatalf("limit=1 page = %+v", first)
+	}
 	if len(mine.Reservations) != 2 || mine.Reservations[0].ID != sooner || mine.Reservations[1].ID != later {
 		t.Fatalf("mine order = %+v, want sooner then later", mine.Reservations)
 	}

@@ -44,6 +44,9 @@ function png(w, h) {
 const SHOTS = process.env.E2E_SHOTS ?? mkdtempSync(join(tmpdir(), "e2e-shots-"));
 const PHOTO = join(SHOTS, "photo.png");
 writeFileSync(PHOTO, png(64, 48));
+// Larger than 1600 px, so the browser must resize it to JPEG before upload.
+const BIG_PHOTO = join(SHOTS, "big-photo.png");
+writeFileSync(BIG_PHOTO, png(2400, 1600));
 const port = 9800 + Math.floor(Math.random() * 100);
 const edge = spawn(browser, [
   "--headless=new", "--disable-gpu", `--remote-debugging-port=${port}`,
@@ -104,6 +107,19 @@ try {
     return email;
   });
 
+  await step("rename in account settings", async () => {
+    await go("/me/account");
+    await evaluate(`await waitFor(() => text().includes("Account")); fill("Name", "Eve K.");
+      await waitFor(() => !byText("button", "Save name").disabled); click("Save name", "button");
+      await waitFor(() => text().includes("Name updated.") && text().includes("Eve K."));`);
+    return "header shows Eve K.";
+  });
+
+  await step("change password", async () => {
+    await evaluate(`fill("Current password", "password123"); fill("New password", "password456"); fill("Repeat new password", "password456");
+      click("Change password", "button"); await waitFor(() => text().includes("Password changed."));`);
+  });
+
   let reservationId;
   await step("book a table", async () => {
     await go("/restaurants/2");
@@ -155,12 +171,14 @@ try {
       [...document.querySelectorAll('input[type=checkbox]')].forEach((c) => { if (!c.checked) c.click(); });`);
     const { root } = await send("DOM.getDocument");
     const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: 'input[type=file]' });
-    await send("DOM.setFileInputFiles", { nodeId, files: [PHOTO, PHOTO] });
+    await send("DOM.setFileInputFiles", { nodeId, files: [BIG_PHOTO, PHOTO] });
     await evaluate(`await waitFor(() => document.querySelectorAll('img[src^="blob:"]').length === 2); click("Create restaurant", "button");
       await waitFor(() => /^\\/restaurants\\/\\d+$/.test(location.pathname) && text().includes("E2E Kitchen"), 10000);`);
     newId = await evaluate(`return location.pathname.split("/").pop()`);
     await shot("created");
-    return `id ${newId}, owner banner: ${await evaluate(`return text().includes("This is your restaurant")`)}`;
+    const cover = await evaluate(`return document.querySelector('img[alt="E2E Kitchen"]')?.src ?? ""`);
+    if (!cover.endsWith(".jpg")) throw new Error("big photo was not resized to JPEG: " + cover);
+    return `id ${newId}, cover resized to ${cover.split(".").pop()}`;
   });
 
   await step("edit it: change seats, remove a photo", async () => {
@@ -186,6 +204,12 @@ try {
 
   await step("log out", async () => {
     await evaluate(`click("E"); click("Log out", "button"); await waitFor(() => text().includes("Log in") && !text().includes("Eve"));`);
+  });
+
+  await step("log in with the new password", async () => {
+    await go("/login");
+    await evaluate(`fill("Email", "${email}"); fill("Password", "password456"); click("Log in", "button[type=submit]");
+      await waitFor(() => location.pathname === "/" && text().includes("Eve K."));`);
   });
 
   console.log(problems.length ? `\nProblems:\n${problems.join("\n")}\nScreenshots: ${SHOTS}` : "\nNo console errors or exceptions.");

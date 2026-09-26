@@ -34,6 +34,15 @@ export const account: Account = {
   has_password: true,
 };
 
+// Signed up with Google and never set a password.
+export const googleAccount: Account = {
+  id: 9,
+  email: "nok@gmail.com",
+  display_name: "Nok",
+  email_verified: true,
+  has_password: false,
+};
+
 export const owner: Account = {
   id: 1,
   email: "somchai@example.com",

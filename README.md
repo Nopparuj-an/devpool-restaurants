@@ -31,6 +31,7 @@ Additional requirements: Go 1.27+, Node 24 with pnpm (`corepack enable`).
 ```sh
 make env && make up && make garage-init   # same infra as above
 make seed                                 # demo data
+make seed-bulk N=10000                    # optional load-test data (make seed-bulk-remove to undo)
 make api                                  # API on http://localhost:8080
 cd frontend && pnpm install && pnpm dev   # web on http://localhost:3000
 ```

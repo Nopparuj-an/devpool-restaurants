@@ -34,22 +34,26 @@ func NewHandler(svc service.Service) *Handler { return &Handler{svc: svc} }
 func (h *Handler) List(c *gin.Context) error {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
-	list, err := h.svc.List(c.Request.Context(), model.ListQuery{
+	list, total, err := h.svc.List(c.Request.Context(), model.ListQuery{
 		Sort: c.Query("sort"), Q: c.Query("q"), Cuisine: c.Query("cuisine"), Limit: limit, Offset: offset,
 	})
 	if err != nil {
 		return err
 	}
-	c.JSON(http.StatusOK, gin.H{"restaurants": list})
+	c.JSON(http.StatusOK, gin.H{"restaurants": list, "total": total})
 	return nil
 }
 
 func (h *Handler) Mine(c *gin.Context) error {
-	list, err := h.svc.List(c.Request.Context(), model.ListQuery{Sort: "newest", OwnerID: auth.MustAccount(c).ID, Limit: 100})
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	list, total, err := h.svc.List(c.Request.Context(), model.ListQuery{
+		Sort: "newest", OwnerID: auth.MustAccount(c).ID, Limit: limit, Offset: offset,
+	})
 	if err != nil {
 		return err
 	}
-	c.JSON(http.StatusOK, gin.H{"restaurants": list})
+	c.JSON(http.StatusOK, gin.H{"restaurants": list, "total": total})
 	return nil
 }
 

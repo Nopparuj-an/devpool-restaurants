@@ -145,14 +145,14 @@ const summarySelect = `
 
 func scanSummary(row pgx.Row) (model.Summary, error) {
 	var sm model.Summary
-	err := row.Scan(&sm.ID, &sm.Name, &sm.Cuisine, &sm.Location, &sm.Seats,
-		&sm.Rating, &sm.ReviewCount, &sm.CoverKey, &sm.Owner.ID, &sm.Owner.DisplayName)
+	err := row.Scan(summaryDest(&sm)...)
 	return sm, err
 }
 
 // List sorts by the Bayesian average for top_rated (ADR-0004):
 // (sum + m·C) / (count + m), where C is the mean of all reviews.
-func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summary, error) {
+// count(*) OVER () gives the total matches in the same query as the page.
+func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summary, int, error) {
 	var (
 		where []string
 		args  []any
@@ -163,7 +163,8 @@ func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summa
 	}
 	if q.Q != "" {
 		escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(q.Q)
-		where = append(where, "r.name ILIKE '%' || "+arg(escaped)+" || '%'")
+		p := arg(escaped)
+		where = append(where, "(r.name ILIKE '%' || "+p+" || '%' OR r.cuisine ILIKE '%' || "+p+" || '%')")
 	}
 	if q.Cuisine != "" {
 		where = append(where, "lower(r.cuisine) = lower("+arg(q.Cuisine)+")")
@@ -178,27 +179,45 @@ func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summa
 	}
 	order["top_rated"] = order[""]
 
-	sql := summarySelect + `
+	sql := strings.Replace(summarySelect, "SELECT ", "SELECT count(*) OVER () AS total, ", 1) + `
 	CROSS JOIN (SELECT coalesce(avg(rating), 0)::float8 AS c FROM reviews) g`
-	if len(where) > 0 {
-		sql += "\n\tWHERE " + strings.Join(where, " AND ")
-	}
+	sql += whereSQL(where)
 	sql += "\n\tORDER BY " + order[q.Sort] + " LIMIT " + arg(q.Limit) + " OFFSET " + arg(q.Offset)
 
 	rows, err := r.db.Conn(ctx).Query(ctx, sql, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	out := []model.Summary{}
+	total := 0
 	for rows.Next() {
-		sm, err := scanSummary(rows)
-		if err != nil {
-			return nil, err
+		var sm model.Summary
+		if err := rows.Scan(append([]any{&total}, summaryDest(&sm)...)...); err != nil {
+			return nil, 0, err
 		}
 		out = append(out, sm)
 	}
-	return out, rows.Err()
+	if len(out) == 0 && q.Offset > 0 {
+		// Past the last page the window has no rows to report the total on.
+		err := r.db.Conn(ctx).QueryRow(ctx, "SELECT count(*) FROM restaurants r"+whereSQL(where), args[:len(args)-2]...).Scan(&total)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	return out, total, rows.Err()
+}
+
+func summaryDest(sm *model.Summary) []any {
+	return []any{&sm.ID, &sm.Name, &sm.Cuisine, &sm.Location, &sm.Seats,
+		&sm.Rating, &sm.ReviewCount, &sm.CoverKey, &sm.Owner.ID, &sm.Owner.DisplayName}
+}
+
+func whereSQL(where []string) string {
+	if len(where) == 0 {
+		return ""
+	}
+	return " WHERE " + strings.Join(where, " AND ")
 }
 
 func (r *Repository) Get(ctx context.Context, id int64) (model.Detail, error) {

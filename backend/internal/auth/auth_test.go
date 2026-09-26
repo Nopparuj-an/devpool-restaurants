@@ -64,3 +64,24 @@ func TestForgedCookieIsAnonymous(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "session", Value: "forged"})
 	env.Client().Send(req).ExpectError(http.StatusUnauthorized, "unauthorized")
 }
+
+func TestUpdateProfile(t *testing.T) {
+	env := apitest.New(t)
+	dana := env.Signup("dana@example.com", "Dana")
+
+	var me struct {
+		DisplayName string `json:"display_name"`
+		Email       string `json:"email"`
+	}
+	dana.Do("PUT", "/api/me", map[string]string{"display_name": "  Dana K.  "}).Expect(http.StatusOK).JSON(&me)
+	if me.DisplayName != "Dana K." || me.Email != "dana@example.com" {
+		t.Fatalf("me = %+v", me)
+	}
+	dana.Do("GET", "/api/me", nil).Expect(http.StatusOK).JSON(&me)
+	if me.DisplayName != "Dana K." {
+		t.Fatalf("rename not saved: %+v", me)
+	}
+	dana.Do("PUT", "/api/me", map[string]string{"display_name": "   "}).ExpectError(http.StatusUnprocessableEntity, "invalid_input")
+	dana.Do("PUT", "/api/me", map[string]string{"email": "x@example.com"}).ExpectError(http.StatusBadRequest, "bad_request")
+	env.Client().Do("PUT", "/api/me", map[string]string{"display_name": "X"}).ExpectError(http.StatusUnauthorized, "unauthorized")
+}

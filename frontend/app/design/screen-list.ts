@@ -13,6 +13,8 @@ export const SCREENS = [
   { name: "restaurant-new", title: "Add a restaurant" },
   { name: "restaurant-edit", title: "Edit a restaurant" },
   { name: "owner-bookings", title: "Owner bookings" },
+  { name: "account", title: "Account settings" },
+  { name: "account-google", title: "Account settings, Google login only" },
   { name: "login", title: "Log in" },
   { name: "signup", title: "Sign up" },
 ] as const;

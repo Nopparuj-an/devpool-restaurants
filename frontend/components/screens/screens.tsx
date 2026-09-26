@@ -4,8 +4,9 @@
 // data; the real routes will feed them API data with the same shapes.
 import { Pencil, Plus, Search, Table2 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { PasswordForm, ProfileForm } from "@/components/app/account-forms";
 import { AuthForm, type AuthInput } from "@/components/app/auth-form";
 import { BookingPanel, DayTabs, type BookingInput } from "@/components/app/booking-panel";
 import { LoadStrip, OwnerTable } from "@/components/app/owner-table";
@@ -19,6 +20,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { ConfirmDialog, Segmented } from "@/components/ui/controls";
 import { Input } from "@/components/ui/field";
 import { EmptyState, Photo, Rating } from "@/components/ui/misc";
+import { Pagination, ShowMore } from "@/components/ui/pagination";
 import * as fmt from "@/lib/format";
 import type {
   Account,
@@ -29,6 +31,7 @@ import type {
   Review,
   SortKey,
 } from "@/lib/types";
+import { HOME_PAGE_SIZE } from "@/lib/paging";
 import { useTimeZone } from "@/lib/use-time-zone";
 
 type Result = Promise<{ error?: string }>;
@@ -40,24 +43,39 @@ const SORTS: { value: SortKey; label: string }[] = [
   { value: "newest", label: "New" },
 ];
 
+// Search, sort and paging all happen on the server; the screen reports
+// changes and the route turns them into ?q=&sort=&page=.
 export function HomeScreen({
   account,
   restaurants,
+  total,
   sort,
+  query,
+  page,
   onSort,
+  onQuery,
+  hrefForPage,
   limitedIds = [],
 }: {
   account: Account | null;
   restaurants: RestaurantSummary[];
+  total: number;
   sort: SortKey;
+  query: string;
+  page: number;
   onSort: (sort: SortKey) => void;
+  onQuery: (query: string) => void;
+  hrefForPage: (page: number) => string;
   limitedIds?: number[];
 }) {
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const shown = restaurants.filter(
-    (r) => !q || r.name.toLowerCase().includes(q) || r.cuisine.toLowerCase().includes(q),
-  );
+  const [text, setText] = useState(query);
+  // Search 300 ms after typing stops, not on every key.
+  useEffect(() => {
+    if (text.trim() === query) return;
+    const t = setTimeout(() => onQuery(text.trim()), 300);
+    return () => clearTimeout(t);
+  }, [text, query, onQuery]);
+
   return (
     <>
       <SiteHeader account={account} current="/" />
@@ -67,8 +85,8 @@ export function HomeScreen({
           <div className="relative sm:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-faint" />
             <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
               placeholder="Search by name or cuisine"
               className="pl-9"
               aria-label="Search restaurants"
@@ -76,15 +94,25 @@ export function HomeScreen({
           </div>
           <Segmented label="Sort by" options={SORTS} value={sort} onChange={onSort} />
         </div>
-        {shown.length === 0 ? (
-          <EmptyState title="Nothing matches that search">Try a different name or cuisine.</EmptyState>
+        {query && (
+          <p className="-mt-4 mb-6 text-sm text-muted">
+            {total === 1 ? "1 restaurant" : `${total.toLocaleString("en")} restaurants`} match &quot;{query}&quot;
+          </p>
+        )}
+        {restaurants.length === 0 ? (
+          query ? (
+            <EmptyState title="Nothing matches that search">Try a different name or cuisine.</EmptyState>
+          ) : (
+            <EmptyState title="No restaurants yet" />
+          )
         ) : (
           <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-            {shown.map((r) => (
+            {restaurants.map((r) => (
               <RestaurantCard key={r.id} restaurant={r} limited={limitedIds.includes(r.id)} />
             ))}
           </div>
         )}
+        <Pagination page={page} pageCount={Math.ceil(total / HOME_PAGE_SIZE)} hrefFor={hrefForPage} />
       </Page>
     </>
   );
@@ -103,10 +131,15 @@ export function RestaurantScreen({
   onDeleteReview,
   editing,
   initialDay,
+  reviewsTotal,
+  onMoreReviews,
 }: {
   account: Account | null;
   restaurant: RestaurantDetail;
   reviews: Review[];
+  // All reviews count; `reviews` may be the first page only.
+  reviewsTotal?: number;
+  onMoreReviews?: () => Promise<void>;
   myReview?: Review;
   days: Day[];
   now: string;
@@ -118,6 +151,7 @@ export function RestaurantScreen({
   initialDay?: string;
 }) {
   const others = reviews.filter((rv) => rv.id !== myReview?.id);
+  const [loadingMore, setLoadingMore] = useState(false);
   return (
     <>
       <SiteHeader account={account} current="/" />
@@ -189,6 +223,18 @@ export function RestaurantScreen({
                     {others.map((rv) => (
                       <ReviewItem key={rv.id} review={rv} />
                     ))}
+                    {onMoreReviews && (
+                      <ShowMore
+                        shown={reviews.length}
+                        total={reviewsTotal ?? reviews.length}
+                        busy={loadingMore}
+                        onMore={async () => {
+                          setLoadingMore(true);
+                          await onMoreReviews();
+                          setLoadingMore(false);
+                        }}
+                      />
+                    )}
                   </div>
                 )}
               </section>
@@ -203,16 +249,22 @@ export function RestaurantScreen({
 export function MyBookingsScreen({
   account,
   reservations,
+  total,
+  onMore,
   onCancel,
   onChange,
 }: {
   account: Account;
   reservations: Reservation[];
+  // All bookings; `reservations` may be the first pages only (current ones come first).
+  total?: number;
+  onMore?: () => Promise<void>;
   onCancel: (r: Reservation) => Promise<void>;
   onChange: (r: Reservation) => void;
 }) {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const tz = useTimeZone();
   const upcoming = reservations.filter((r) => r.state === "upcoming" || r.state === "in_progress");
   const past = reservations.filter((r) => r.state === "completed" || r.state === "cancelled");
@@ -244,6 +296,18 @@ export function MyBookingsScreen({
               <ReservationCard key={r.id} reservation={r} onCancel={() => setCancelling(r)} onChange={() => onChange(r)} />
             ))}
           </div>
+        )}
+        {tab === "past" && onMore && (
+          <ShowMore
+            shown={reservations.length}
+            total={total ?? reservations.length}
+            busy={loadingMore}
+            onMore={async () => {
+              setLoadingMore(true);
+              await onMore();
+              setLoadingMore(false);
+            }}
+          />
         )}
         <ConfirmDialog
           open={cancelling !== null}
@@ -392,6 +456,29 @@ export function OwnerBookingsScreen({
             <OwnerTable reservations={reservations} />
           </div>
         )}
+      </Page>
+    </>
+  );
+}
+
+export function AccountScreen({
+  account,
+  onSaveName,
+  onSetPassword,
+}: {
+  account: Account;
+  onSaveName: (name: string) => Result;
+  onSetPassword: (current: string, next: string) => Result;
+}) {
+  return (
+    <>
+      <SiteHeader account={account} />
+      <Page>
+        <PageTitle title="Account" />
+        <div className="max-w-3xl">
+          <ProfileForm account={account} onSave={onSaveName} />
+          <PasswordForm hasPassword={account.has_password} onSave={onSetPassword} />
+        </div>
       </Page>
     </>
   );

@@ -117,13 +117,19 @@ func (r *Repository) ByID(ctx context.Context, accountID, id int64) (model.Reser
 
 // ByAccount lists current reservations first (soonest first), then past or
 // cancelled ones (most recent first).
-func (r *Repository) ByAccount(ctx context.Context, accountID int64, now time.Time) ([]model.Reservation, error) {
-	return r.list(ctx, listSelect+`
+func (r *Repository) ByAccount(ctx context.Context, accountID int64, now time.Time, limit, offset int) ([]model.Reservation, int, error) {
+	var total int
+	if err := r.db.Conn(ctx).QueryRow(ctx, `SELECT count(*) FROM reservations WHERE account_id = $1`, accountID).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	list, err := r.list(ctx, listSelect+`
 		WHERE v.account_id = $1
 		ORDER BY
 			(v.ends_at <= $2 OR v.status = 'cancelled'),
 			CASE WHEN v.ends_at > $2 AND v.status = 'active' THEN v.starts_at END,
-			v.starts_at DESC`, accountID, now)
+			v.starts_at DESC, v.id DESC
+		LIMIT $3 OFFSET $4`, accountID, now, limit, offset)
+	return list, total, err
 }
 
 func (r *Repository) ByRestaurant(ctx context.Context, restaurantID int64, from, to time.Time) ([]model.Reservation, error) {

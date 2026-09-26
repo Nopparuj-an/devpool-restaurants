@@ -14,6 +14,7 @@ package reservation
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -105,11 +106,13 @@ func (h *Handler) write(c *gin.Context, me, id int64, status int) error {
 }
 
 func (h *Handler) ListMine(c *gin.Context) error {
-	list, err := h.svc.ListMine(c.Request.Context(), auth.MustAccount(c).ID)
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	list, total, err := h.svc.ListMine(c.Request.Context(), auth.MustAccount(c).ID, limit, offset)
 	if err != nil {
 		return err
 	}
-	c.JSON(http.StatusOK, gin.H{"reservations": list})
+	c.JSON(http.StatusOK, gin.H{"reservations": list, "total": total})
 	return nil
 }
 
@@ -122,6 +125,10 @@ func (h *Handler) ListForOwner(c *gin.Context) error {
 	from, to, err := timeRange(c, 7*24*time.Hour)
 	if err != nil {
 		return err
+	}
+	// The owner table is bounded by time, not pages: at most 31 days at once.
+	if !to.After(from) || to.Sub(from) > 31*24*time.Hour {
+		return apperr.InvalidInput("range must be positive and at most 31 days")
 	}
 	list, err := h.svc.ListForOwner(c.Request.Context(), auth.MustAccount(c).ID, id, from, to)
 	if err != nil {

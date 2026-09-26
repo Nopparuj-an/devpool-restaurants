@@ -48,6 +48,9 @@ export function SiteHeader({ account, current }: { account: Account | null; curr
               </summary>
               <div className="absolute right-0 z-10 mt-2 w-56 rounded-xl border border-line bg-white p-1 shadow-sm">
                 <p className="truncate px-3 py-2 text-xs text-muted">{account.email}</p>
+                <Link href="/me/account" className="block rounded-lg px-3 py-2 text-sm hover:bg-surface">
+                  Account settings
+                </Link>
                 <button
                   type="button"
                   onClick={logout}

@@ -7,11 +7,13 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
+	"restaurants/internal/platform/imageproc"
 	"restaurants/internal/restaurant/model"
 )
 
@@ -32,7 +34,8 @@ type Repository interface {
 	PromoteFirstImage(ctx context.Context, id int64) error
 	SetCover(ctx context.Context, id, imageID int64) error // ErrNotFound if missing
 
-	List(ctx context.Context, q model.ListQuery) ([]model.Summary, error)
+	// List returns one page and the total number of matches.
+	List(ctx context.Context, q model.ListQuery) ([]model.Summary, int, error)
 	Get(ctx context.Context, id int64) (model.Detail, error) // ErrNotFound if missing
 	UpcomingReservations(ctx context.Context, id int64, now time.Time) (int, error)
 }
@@ -56,7 +59,8 @@ type Service interface {
 	AddImages(ctx context.Context, me, id int64, uploads []model.Upload) error
 	DeleteImage(ctx context.Context, me, id, imageID int64) error
 	SetCover(ctx context.Context, me, id, imageID int64) error
-	List(ctx context.Context, q model.ListQuery) ([]model.Summary, error)
+	// List returns one page (limit ≤ 100, default 50) and the total number of matches.
+	List(ctx context.Context, q model.ListQuery) ([]model.Summary, int, error)
 	// Get returns one restaurant; viewer is the logged-in account ID or 0.
 	Get(ctx context.Context, viewer, id int64) (model.Detail, error)
 }
@@ -189,8 +193,16 @@ func (s *service) putImages(ctx context.Context, id int64, uploads []model.Uploa
 	}
 	var keys []string
 	for i, u := range uploads {
-		key := fmt.Sprintf("restaurants/%d/%s%s", id, randomHex(16), u.Ext)
-		if err := s.images.Put(ctx, key, u.ContentType, u.Data); err != nil {
+		// Oversized photos are shrunk to 1600 px JPEG before storage.
+		img, err := imageproc.Normalize(u.Data)
+		switch {
+		case errors.Is(err, imageproc.ErrTooManyPx):
+			return keys, model.ErrImagePixels
+		case err != nil:
+			return keys, model.ErrImageType
+		}
+		key := fmt.Sprintf("restaurants/%d/%s%s", id, randomHex(16), img.Ext)
+		if err := s.images.Put(ctx, key, img.ContentType, img.Data); err != nil {
 			return keys, err
 		}
 		keys = append(keys, key)
@@ -241,21 +253,22 @@ func (s *service) SetCover(ctx context.Context, me, id, imageID int64) error {
 	})
 }
 
-func (s *service) List(ctx context.Context, q model.ListQuery) ([]model.Summary, error) {
+func (s *service) List(ctx context.Context, q model.ListQuery) ([]model.Summary, int, error) {
 	switch q.Sort {
 	case "", "top_rated", "most_reviewed", "newest":
 	default:
-		return nil, model.ErrInvalidSort
+		return nil, 0, model.ErrInvalidSort
 	}
 	if q.Limit <= 0 || q.Limit > 100 {
 		q.Limit = 50
 	}
 	q.Offset = max(q.Offset, 0)
-	list, err := s.repo.List(ctx, q)
+	q.Q = strings.TrimSpace(q.Q)
+	list, total, err := s.repo.List(ctx, q)
 	for i := range list {
 		list[i].CoverURL = s.url(list[i].CoverKey)
 	}
-	return list, err
+	return list, total, err
 }
 
 func (s *service) Get(ctx context.Context, viewer, id int64) (model.Detail, error) {

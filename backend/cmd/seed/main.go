@@ -2,11 +2,15 @@
 // images, reservations and reviews, so the app has something to show right
 // after setup. It goes through the same services as the API, so every
 // business rule applies. Run with `make seed`; it does nothing if already seeded.
+//
+// `-bulk N` adds N generated users and restaurants for load checks, and
+// `-bulk-remove` takes them out again (make seed-bulk / seed-bulk-remove).
 package main
 
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"image"
 	"image/color"
@@ -57,6 +61,9 @@ type seeder struct {
 }
 
 func run() error {
+	bulk := flag.Int("bulk", 0, "add N generated users and restaurants")
+	bulkRemove := flag.Bool("bulk-remove", false, "remove generated users and restaurants")
+	flag.Parse()
 	time.Local = time.UTC
 	ctx := context.Background()
 	cfg, err := config.Load()
@@ -70,6 +77,14 @@ func run() error {
 	defer pool.Close()
 	if err := database.Migrate(ctx, pool); err != nil {
 		return err
+	}
+
+	if *bulk > 0 || *bulkRemove {
+		db, images := database.New(pool), storage.NewS3(cfg.S3)
+		if *bulkRemove {
+			return removeBulk(ctx, db, images)
+		}
+		return seedBulk(ctx, db, images, *bulk)
 	}
 
 	var seeded bool
@@ -275,17 +290,19 @@ func at(day time.Time, hhmm string) time.Time {
 
 // art draws a simple placeholder "photo": a diagonal gradient with soft
 // circles, tinted by hue. Swap for real photos any time via the UI.
-func art(hue float64, seed int) []byte {
-	const w, hgt = 960, 640
+func art(hue float64, seed int) []byte { return artSized(960, 640, hue, seed) }
+
+func artSized(w, hgt int, hue float64, seed int) []byte {
 	img := image.NewRGBA(image.Rect(0, 0, w, hgt))
-	cx := []float64{0.25, 0.7, 0.5}[seed%3] * w
-	cy := []float64{0.4, 0.3, 0.7}[seed%3] * hgt
+	cx := []float64{0.25, 0.7, 0.5}[seed%3] * float64(w)
+	cy := []float64{0.4, 0.3, 0.7}[seed%3] * float64(hgt)
+	r := float64(hgt) * 0.28
 	for y := range hgt {
 		for x := range w {
-			t := (float64(x)/w + float64(y)/hgt) / 2
+			t := (float64(x)/float64(w) + float64(y)/float64(hgt)) / 2
 			l := 0.35 + 0.35*t
-			if dist := math.Hypot(float64(x)-cx, float64(y)-cy); dist < 180 {
-				l += 0.15 * (1 - dist/180)
+			if dist := math.Hypot(float64(x)-cx, float64(y)-cy); dist < r {
+				l += 0.15 * (1 - dist/r)
 			}
 			img.Set(x, y, hsl(hue+40*t, 0.55, l))
 		}

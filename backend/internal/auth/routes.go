@@ -16,5 +16,6 @@ func RegisterRoutes(api *gin.RouterGroup, h *Handler) {
 
 	me := api.Group("/me", RequireLogin())
 	me.GET("", web.Handle(h.Me))
+	me.PUT("", web.Handle(h.UpdateProfile))
 	me.PUT("/password", web.Handle(h.SetPassword))
 }

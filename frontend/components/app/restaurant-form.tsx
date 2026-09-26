@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ui/controls";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Badge, Notice, Photo } from "@/components/ui/misc";
 import { WEEKDAYS, duration } from "@/lib/format";
+import { compressImage } from "@/lib/image";
 import type { Hours, RestaurantDetail, RestaurantImage } from "@/lib/types";
 
 export type RestaurantInput = {
@@ -34,7 +35,10 @@ type DayRow = { open: boolean; from: string; to: string };
 export type PhotoItem = { key: string; url: string; isCover: boolean; id?: number; file?: File };
 
 const MAX_PHOTOS = 10;
-const MAX_BYTES = 5 * 1024 * 1024;
+// Checked after browser compression (lib/image.ts); the API allows 10 MB.
+const MAX_BYTES = 10 * 1024 * 1024;
+// What people may pick before compression, e.g. a large phone photo.
+const MAX_PICK_BYTES = 40 * 1024 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 function toRows(hours: Hours[]): DayRow[] {
@@ -80,6 +84,7 @@ export function RestaurantForm({
     initialImages.map((img) => ({ key: `img-${img.id}`, url: img.url, isCover: img.is_cover, id: img.id })),
   );
   const [saving, setSaving] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
 
@@ -100,12 +105,17 @@ export function RestaurantForm({
     setMessage(res.error ? { tone: "danger", text: res.error } : { tone: "success", text: "Saved." });
   }
 
-  function addFiles(files: FileList | null) {
+  async function addFiles(files: FileList | null) {
     if (!files) return;
-    const picked = Array.from(files);
-    const bad = picked.find((f) => !PHOTO_TYPES.includes(f.type) || f.size > MAX_BYTES);
-    if (bad) return setMessage({ tone: "danger", text: `${bad.name} must be a JPEG, PNG or WebP under 5 MB.` });
+    const chosen = Array.from(files);
+    const bad = chosen.find((f) => !PHOTO_TYPES.includes(f.type) || f.size > MAX_PICK_BYTES);
+    if (bad) return setMessage({ tone: "danger", text: `${bad.name} must be a JPEG, PNG or WebP photo.` });
     setMessage(null);
+    setPreparing(true);
+    const picked = await Promise.all(chosen.map(compressImage));
+    setPreparing(false);
+    const tooBig = picked.find((f) => f.size > MAX_BYTES);
+    if (tooBig) return setMessage({ tone: "danger", text: `${tooBig.name} is still over 10 MB after resizing.` });
     setImages((xs) => {
       const room = MAX_PHOTOS - xs.length;
       const added = picked.slice(0, room).map((file, i) => ({
@@ -140,7 +150,7 @@ export function RestaurantForm({
         </Field>
       </Section>
 
-      <Section title="Photos" hint="The first photo is the cover. Up to 10, JPEG, PNG or WebP, 5 MB each.">
+      <Section title="Photos" hint="The first photo is the cover. Up to 10 JPEG, PNG or WebP photos. Large photos are resized before upload.">
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {images.map((img, i) => (
             <div key={img.key} className="group relative">
@@ -178,7 +188,7 @@ export function RestaurantForm({
           {images.length < 10 && (
             <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line text-sm text-muted transition-colors hover:border-accent hover:text-accent">
               <ImagePlus className="size-5" />
-              Add photos
+              {preparing ? "Resizing…" : "Add photos"}
               <input
                 type="file"
                 accept={PHOTO_TYPES.join(",")}
@@ -263,7 +273,7 @@ export function RestaurantForm({
       </Section>
 
       <div className="flex flex-wrap items-center gap-3 pt-8">
-        <Button onClick={save} disabled={saving}>
+        <Button onClick={save} disabled={saving || preparing}>
           {saving ? "Saving…" : initial ? "Save changes" : "Create restaurant"}
         </Button>
         {message && <Notice tone={message.tone}>{message.text}</Notice>}

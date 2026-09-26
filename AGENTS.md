@@ -17,9 +17,10 @@ make env          # first time: create deployment/.env with random secrets
 make up           # Postgres + Garage (data in deployment/data/)
 make garage-init  # first time: Garage layout, key, bucket, website mode
 make seed         # demo data (no-op if already seeded)
+make seed-bulk N=10000   # load-test data; make seed-bulk-remove to undo
 make api          # run Go API on :8080 (applies migrations)
 make test         # backend tests
 make app-up       # API + web in containers (web on :3000); app compose is separate from infra
 ```
 
-Frontend: `cd frontend && pnpm dev`. Next.js 16 differs from older versions; read `frontend/AGENTS.md` first. UI conventions and copy rules: `docs/design.md`; the gallery is at `/design`.
+Frontend: `cd frontend && pnpm dev`. Next.js 16 differs from older versions; read `frontend/AGENTS.md` first. UI conventions and copy rules: `docs/design.md`; the gallery is at `/design`. Never import plain values from a `"use client"` module into server code (see docs/design.md).

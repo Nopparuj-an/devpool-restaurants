@@ -34,7 +34,7 @@ type Repository interface {
 	Cancel(ctx context.Context, id int64) error
 
 	ByID(ctx context.Context, accountID, id int64) (model.Reservation, error) // apperr.ErrNotFound if missing
-	ByAccount(ctx context.Context, accountID int64, now time.Time) ([]model.Reservation, error)
+	ByAccount(ctx context.Context, accountID int64, now time.Time, limit, offset int) ([]model.Reservation, int, error)
 	ByRestaurant(ctx context.Context, restaurantID int64, from, to time.Time) ([]model.Reservation, error)
 }
 
@@ -48,7 +48,8 @@ type Service interface {
 	Update(ctx context.Context, me, id int64, in model.Input) error
 	Cancel(ctx context.Context, me, id int64) error
 	Get(ctx context.Context, me, id int64) (model.Reservation, error)
-	ListMine(ctx context.Context, me int64) ([]model.Reservation, error)
+	// ListMine returns one page (limit ≤ 100, default 50) and the total.
+	ListMine(ctx context.Context, me int64, limit, offset int) ([]model.Reservation, int, error)
 	ListForOwner(ctx context.Context, me, restaurantID int64, from, to time.Time) ([]model.Reservation, error)
 	Availability(ctx context.Context, restaurantID int64, from, to time.Time) (model.Availability, error)
 }
@@ -148,13 +149,16 @@ func (s *service) Get(ctx context.Context, me, id int64) (model.Reservation, err
 	return r, nil
 }
 
-func (s *service) ListMine(ctx context.Context, me int64) ([]model.Reservation, error) {
+func (s *service) ListMine(ctx context.Context, me int64, limit, offset int) ([]model.Reservation, int, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
 	now := s.now()
-	list, err := s.repo.ByAccount(ctx, me, now)
+	list, total, err := s.repo.ByAccount(ctx, me, now, limit, max(offset, 0))
 	for i := range list {
 		s.derive(&list[i], now, false)
 	}
-	return list, err
+	return list, total, err
 }
 
 func (s *service) ListForOwner(ctx context.Context, me, restaurantID int64, from, to time.Time) ([]model.Reservation, error) {

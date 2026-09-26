@@ -159,6 +159,11 @@ func (r *Repository) LinkGoogle(ctx context.Context, accountID int64, subject st
 	return err
 }
 
+func (r *Repository) UpdateDisplayName(ctx context.Context, accountID int64, displayName string) error {
+	_, err := r.db.Conn(ctx).Exec(ctx, `UPDATE accounts SET display_name = $2 WHERE id = $1`, accountID, displayName)
+	return err
+}
+
 func (r *Repository) Account(ctx context.Context, id int64) (model.Account, error) {
 	return scanAccount(r.db.Conn(ctx).QueryRow(ctx, `SELECT `+accountColumns+` FROM accounts a WHERE a.id = $1`, id))
 }

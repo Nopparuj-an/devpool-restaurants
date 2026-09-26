@@ -11,6 +11,7 @@ import (
 	"net/mail"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -38,6 +39,7 @@ type Repository interface {
 	CreateVerifiedAccount(ctx context.Context, email, displayName string) (int64, error)
 	LinkGoogle(ctx context.Context, accountID int64, subject string) error // ErrGoogleConflict on duplicate
 	Account(ctx context.Context, id int64) (model.Account, error)
+	UpdateDisplayName(ctx context.Context, accountID int64, displayName string) error
 }
 
 // TxRunner runs fn in one database transaction (platform/database.DB).
@@ -50,6 +52,7 @@ type Service interface {
 	Signup(ctx context.Context, email, password, displayName string) (model.Account, error)
 	Login(ctx context.Context, email, password string) (model.Account, error)
 	SetPassword(ctx context.Context, accountID int64, current, next string) error
+	UpdateProfile(ctx context.Context, accountID int64, displayName string) (model.Account, error)
 	LoginWithGoogle(ctx context.Context, g model.GoogleIdentity) (model.Account, error)
 	CreateSession(ctx context.Context, accountID int64) (model.Session, error)
 	AccountForSession(ctx context.Context, token string) (model.Account, error)
@@ -81,6 +84,27 @@ func validatePassword(pw string) error {
 	return nil
 }
 
+func validateDisplayName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if n := utf8.RuneCountInString(name); n < 1 || n > 80 {
+		return "", apperr.InvalidInput("display name must be 1 to 80 characters")
+	}
+	return name, nil
+}
+
+// UpdateProfile changes what others see (the display name). The email is
+// the login identity and can't be changed.
+func (s *service) UpdateProfile(ctx context.Context, accountID int64, displayName string) (model.Account, error) {
+	name, err := validateDisplayName(displayName)
+	if err != nil {
+		return model.Account{}, err
+	}
+	if err := s.repo.UpdateDisplayName(ctx, accountID, name); err != nil {
+		return model.Account{}, err
+	}
+	return s.repo.Account(ctx, accountID)
+}
+
 func (s *service) Signup(ctx context.Context, email, password, displayName string) (model.Account, error) {
 	email, err := normalizeEmail(email)
 	if err != nil {
@@ -89,9 +113,9 @@ func (s *service) Signup(ctx context.Context, email, password, displayName strin
 	if err := validatePassword(password); err != nil {
 		return model.Account{}, err
 	}
-	displayName = strings.TrimSpace(displayName)
-	if displayName == "" || len(displayName) > 80 {
-		return model.Account{}, apperr.InvalidInput("display name must be 1 to 80 characters")
+	displayName, err = validateDisplayName(displayName)
+	if err != nil {
+		return model.Account{}, err
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {

@@ -54,11 +54,14 @@ UI text follows the humanizer rules: sentence case everywhere, plain words, no e
 
 | Route | Screen | Data |
 |---|---|---|
-| `/` | HomeScreen | `?sort=` is passed through to the API |
+| `/` | HomeScreen | `?sort=&q=&page=` all handled by the API, 24 per page |
 | `/restaurants/[id]` | RestaurantScreen | `?edit=<reservation>` switches the booking panel to "Change booking" |
 | `/me/reservations` | MyBookingsScreen | login required |
 | `/me/restaurants`, `/me/restaurants/new` | MyRestaurantsScreen, RestaurantEditorScreen | login required |
 | `/me/restaurants/[id]/edit`, `/bookings` | RestaurantEditorScreen, OwnerBookingsScreen | owner only, otherwise 404 |
+| `/me/account` | AccountScreen | change name; change or set a password |
 | `/login`, `/signup` | AuthScreen | `?next=` (same-site paths only), `?error=` from Google |
 
 Each route is a small server component (`app/**/page.tsx`) that loads data with `lib/api-server.ts`, forwarding the session cookie. It then renders a client wrapper from `components/pages/pages.tsx`, which owns the router and API calls (`lib/api-client.ts`, through the `/api` rewrite). Pages that need a login redirect to `/login?next=…`.
+
+**Gotcha, hit twice:** a server component can't read plain values (constants, objects) exported from a `"use client"` module. It receives a client reference instead of the value, with no error. Shared values go in plain modules like `lib/paging.ts` or `app/design/screen-list.ts`.

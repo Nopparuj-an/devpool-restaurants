@@ -11,6 +11,7 @@ The tests in `backend/internal/*/…_test.go` are the executable spec for these 
 | POST | `/auth/login` | `{email, password}` | `200` Account + cookie. `401 invalid_credentials` |
 | POST | `/auth/logout` | – | `204`, cookie cleared |
 | GET 🔒 | `/me` | – | Account `{id, email, display_name, email_verified, has_password}` |
+| PUT 🔒 | `/me` | `{display_name}` (1 to 80 characters; the email can't change) | Account |
 | GET | `/auth/providers` | – | `{password: true, google: bool}`. Hide the Google button when it's false |
 | GET | `/auth/google/start?next=/path` | – | `302` to Google. Use as a plain link, not fetch |
 | GET | `/auth/google/callback` | (from Google) | `302` to `next` with a session, or to `/login?error=<code>` |
@@ -19,12 +20,12 @@ The tests in `backend/internal/*/…_test.go` are the executable spec for these 
 ## Restaurants
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| GET | `/restaurants` | `?sort=top_rated\|most_reviewed\|newest&q=&cuisine=&limit=&offset=` | `{restaurants: Summary[]}` |
+| GET | `/restaurants` | `?sort=top_rated\|most_reviewed\|newest&q=&cuisine=&limit=&offset=` (`q` matches name or cuisine; limit ≤ 100, default 50) | `{restaurants: Summary[], total}` |
 | GET | `/restaurants/{id}` | – | Detail. Owners also get `is_owner: true` and `upcoming_reservations` |
-| POST 🔒 | `/restaurants` | multipart: `data` = Input JSON, `images` = 1–10 files (the first is the cover) | `201` Detail |
+| POST 🔒 | `/restaurants` | multipart: `data` = Input JSON, `images` = 1 to 10 files, 10 MB each (the first is the cover) | `201` Detail |
 | PUT 🔒 | `/restaurants/{id}` | Input JSON (owner only, `timezone` ignored) | Detail |
 | DELETE 🔒 | `/restaurants/{id}` | – | `204` (cascades, R-REST-5) |
-| GET 🔒 | `/me/restaurants` | – | `{restaurants: Summary[]}` |
+| GET 🔒 | `/me/restaurants` | `?limit=&offset=` | `{restaurants: Summary[], total}` |
 | POST 🔒 | `/restaurants/{id}/images` | multipart `images` | `201 {images}` |
 | DELETE 🔒 | `/restaurants/{id}/images/{imageID}` | – | `{images}`. Deleting the last image returns `422 R-REST-1` |
 | PUT 🔒 | `/restaurants/{id}/images/{imageID}/cover` | – | `{images}` |
@@ -34,6 +35,8 @@ The tests in `backend/internal/*/…_test.go` are the executable spec for these 
 **Summary:** `{id, name, cuisine, location, seats, rating (1 decimal or null), review_count, cover_url, owner: {id, display_name}}`. JSON drops trailing zeros (`5`, not `5.0`), so display it with `rating.toFixed(1)`.
 **Detail:** Summary plus `{description, cancel_cutoff_minutes, max_reservation_minutes, timezone, hours, images: [{id, url, is_cover}], is_owner}`.
 
+Photos larger than 1600 px or 1 MB are resized to 1600 px and stored as JPEG (`platform/imageproc`). Images over 40 megapixels are rejected. The web app already resizes photos in the browser before upload (`lib/image.ts`).
+
 Image URLs are relative (`/images/restaurants/…`). Next.js rewrites `/images/*` to Garage's public web endpoint (ADR-0005).
 
 ## Reservations
@@ -41,11 +44,11 @@ Image URLs are relative (`/images/restaurants/…`). Next.js rewrites `/images/*
 |---|---|---|---|
 | GET | `/restaurants/{id}/availability` | `?from=&to=` (RFC 3339, max 7 days; defaults to the next 24h) | `{seats, limited_threshold, limited, slots: [{start, seats_left, limited}]}`. Returns 15-minute slots inside opening hours only (R-SEATS-1) |
 | POST 🔒 | `/restaurants/{id}/reservations` | `{pax, starts_at, ends_at}` | `201` Reservation. `422 R-BOOK-1…4, 8`, `409 R-BOOK-5` |
-| GET 🔒 | `/me/reservations` | – | `{reservations}`. Current ones first (soonest first), then past or cancelled (most recent first) |
+| GET 🔒 | `/me/reservations` | `?limit=&offset=` (limit ≤ 100, default 50) | `{reservations, total}`. Current ones first (soonest first), then past or cancelled (most recent first) |
 | GET 🔒 | `/reservations/{id}` | – | Reservation (own only, otherwise `404`) |
 | PUT 🔒 | `/reservations/{id}` | `{pax, starts_at, ends_at}` | Reservation. `409 R-EDIT-1` past the cutoff, `409 not_active` if cancelled |
 | POST 🔒 | `/reservations/{id}/cancel` | – | Reservation. `409 R-CANCEL-1` past the cutoff |
-| GET 🔒 | `/restaurants/{id}/reservations` | `?from=&to=` (defaults to the next 7 days) | Owner only. `{reservations}` with `customer: {id, display_name, email}` (R-PRIV-2) |
+| GET 🔒 | `/restaurants/{id}/reservations` | `?from=&to=` (defaults to the next 7 days, at most 31) | Owner only. `{reservations}` with `customer: {id, display_name, email}` (R-PRIV-2) |
 
 **Reservation:** `{id, pax, starts_at, ends_at, status: active|cancelled, state: upcoming|in_progress|completed|cancelled, modifiable_until, can_modify, restaurant: {id, name, cover_url}, customer?}`.
 
@@ -54,7 +57,7 @@ Timestamps in query strings must be URL-encoded (`+07:00` → `%2B07:00`), or ju
 ## Reviews
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| GET | `/restaurants/{id}/reviews` | `?limit=&offset=` | `{reviews}`, most recently updated first |
+| GET | `/restaurants/{id}/reviews` | `?limit=&offset=` (limit ≤ 100, default 20) | `{reviews, total}`, most recently updated first |
 | GET 🔒 | `/restaurants/{id}/reviews/me` | – | My Review, or `404` |
 | PUT 🔒 | `/restaurants/{id}/reviews/me` | `{rating 1-5, body}` | `201` when created, `200` when updated (one per account, R-REVIEW-2). `403 R-REVIEW-3` on your own restaurant |
 | DELETE 🔒 | `/restaurants/{id}/reviews/me` | – | `204` |
