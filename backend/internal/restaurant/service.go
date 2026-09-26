@@ -300,18 +300,33 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
+// Querier is satisfied by both *pgxpool.Pool and pgx.Tx.
+type Querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
 // LockForBooking locks the restaurant row for the rest of tx (ADR-0003) and
 // returns what the booking rules need, plus the owner's account ID.
 func LockForBooking(ctx context.Context, tx pgx.Tx, id int64) (booking.Restaurant, int64, error) {
+	return loadRules(ctx, tx, id, " FOR UPDATE")
+}
+
+// LoadRules is LockForBooking without the lock, for read-only views.
+func LoadRules(ctx context.Context, q Querier, id int64) (booking.Restaurant, int64, error) {
+	return loadRules(ctx, q, id, "")
+}
+
+func loadRules(ctx context.Context, q Querier, id int64, lock string) (booking.Restaurant, int64, error) {
 	var (
 		r                   booking.Restaurant
 		owner               int64
 		cutoff, maxDuration int
 		tz                  string
 	)
-	err := tx.QueryRow(ctx, `
+	err := q.QueryRow(ctx, `
 		SELECT owner_id, seats, cancel_cutoff_minutes, max_reservation_minutes, timezone
-		FROM restaurants WHERE id = $1 FOR UPDATE`, id).
+		FROM restaurants WHERE id = $1`+lock, id).
 		Scan(&owner, &r.Seats, &cutoff, &maxDuration, &tz)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, 0, httpx.ErrNotFound
@@ -324,7 +339,7 @@ func LockForBooking(ctx context.Context, tx pgx.Tx, id int64) (booking.Restauran
 	if r.Location, err = time.LoadLocation(tz); err != nil {
 		return r, 0, fmt.Errorf("restaurant %d timezone %q: %w", id, tz, err)
 	}
-	hours, err := loadHours(ctx, tx, id)
+	hours, err := loadHours(ctx, q, id)
 	if err != nil {
 		return r, 0, err
 	}
@@ -334,9 +349,7 @@ func LockForBooking(ctx context.Context, tx pgx.Tx, id int64) (booking.Restauran
 	return r, owner, nil
 }
 
-func loadHours(ctx context.Context, q interface {
-	Query(context.Context, string, ...any) (pgx.Rows, error)
-}, id int64) ([]shift, error) {
+func loadHours(ctx context.Context, q Querier, id int64) ([]shift, error) {
 	rows, _ := q.Query(ctx, `
 		SELECT weekday, (extract(epoch FROM open_time) / 60)::int, (extract(epoch FROM close_time) / 60)::int
 		FROM restaurant_hours WHERE restaurant_id = $1 ORDER BY weekday`, id)

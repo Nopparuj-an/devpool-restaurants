@@ -19,4 +19,7 @@ Row lock on the restaurant (`FOR UPDATE`) inside one transaction that runs the f
 
 ## Consequences
 - Seat edits by the owner also lock the same row, so they are serialized with bookings.
-- Required tests: a unit test for `peakLoad()` (brief examples, back-to-back bookings, edit excluding self) and an integration test that fires N concurrent goroutines at the last seats and asserts that exactly one succeeds.
+- Tests (`backend/internal/reservation/reservation_test.go`):
+  - `TestBookingWaitsForRestaurantLock` is the **deterministic proof**. A test transaction holds the lock, and a booking request must block, then get `409` once the holder commits. With `FOR UPDATE` removed, this test fails with `201` (overbooking). That was verified on 2026-09-26.
+  - `TestConcurrentLastSeats` is a smoke test: 12 goroutines race for the last 6 seats and exactly one wins. **Lesson learned:** it also passed with the lock removed (0 failures in 20 runs), because the requests rarely overlap in time. A race test that passes proves nothing unless you've seen it fail without the fix.
+- Lock order is always restaurant, then reservation (create, edit, cancel), so two writers can't deadlock.

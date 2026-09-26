@@ -226,3 +226,11 @@ func TestCheckCancel(t *testing.T) {
 		t.Errorf("cancel at 11:31 rule = %q, want R-CANCEL-1", got)
 	}
 }
+
+func TestLimitedThreshold(t *testing.T) {
+	for seats, want := range map[int]int{1: 2, 10: 2, 12: 2, 15: 3, 30: 6} {
+		if got := LimitedThreshold(seats); got != want {
+			t.Errorf("LimitedThreshold(%d) = %d, want %d", seats, got, want)
+		}
+	}
+}

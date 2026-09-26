@@ -50,3 +50,9 @@ func PeakLoad(reservations []Reservation, window Interval) int {
 	}
 	return peak
 }
+
+// LimitedThreshold is the seats-left level at or below which a slot shows
+// "Limited Seats Left" (R-SEATS-1): 2 seats or 20% of seats, whichever is larger.
+func LimitedThreshold(seats int) int {
+	return max(2, seats/5)
+}
