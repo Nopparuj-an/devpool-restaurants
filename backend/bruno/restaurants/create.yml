@@ -1,0 +1,83 @@
+info:
+  name: "/restaurants (create)"
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/restaurants"
+  body:
+    type: multipart-form
+    data:
+      - name: data
+        type: text
+        value: |-
+          {
+            "name": "Bruno Night Kitchen",
+            "description": "Made from the Bruno collection.",
+            "cuisine": "Thai",
+            "location": "Silom, Bangkok",
+            "seats": 12,
+            "cancel_cutoff_minutes": 60,
+            "max_reservation_minutes": 180,
+            "timezone": "Asia/Bangkok",
+            "hours": [
+              {
+                "weekday": 0,
+                "open": "18:00",
+                "close": "02:00"
+              },
+              {
+                "weekday": 1,
+                "open": "18:00",
+                "close": "02:00"
+              },
+              {
+                "weekday": 2,
+                "open": "18:00",
+                "close": "02:00"
+              },
+              {
+                "weekday": 3,
+                "open": "18:00",
+                "close": "02:00"
+              },
+              {
+                "weekday": 4,
+                "open": "18:00",
+                "close": "02:00"
+              },
+              {
+                "weekday": 5,
+                "open": "18:00",
+                "close": "02:00"
+              },
+              {
+                "weekday": 6,
+                "open": "18:00",
+                "close": "02:00"
+              }
+            ]
+          }
+      - name: images
+        type: file
+        value:
+          - fixtures/photo.png
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 201) bru.setVar("restaurant_id", res.body.id);
+
+docs:
+  content: |-
+    multipart/form-data: `data` is the restaurant JSON, `images` 1 to 10 photos (the first is the cover). Open 18:00 to 02:00 every day. Saves `restaurant_id`.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

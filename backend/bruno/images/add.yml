@@ -1,0 +1,33 @@
+info:
+  name: "/restaurants/:id/images"
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/restaurants/{{restaurant_id}}/images"
+  body:
+    type: multipart-form
+    data:
+      - name: images
+        type: file
+        value:
+          - fixtures/photo.png
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.status === 201) { const imgs = res.body.images; bru.setVar("image_id", imgs[imgs.length - 1].id); }
+
+docs:
+  content: |-
+    Large photos are resized to 1600 px JPEG on the server. Saves the new `image_id`.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,37 @@
+info:
+  name: "/reservations/:id (change)"
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{base_url}}/reservations/{{reservation_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "pax": 3,
+        "starts_at": "{{starts_at}}",
+        "ends_at": "{{ends_at}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Tomorrow 19:00 to 20:00 Bangkok time (12:00Z), on the 15-minute grid.
+        const day = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+        bru.setVar("starts_at", `${day}T12:00:00Z`);
+        bru.setVar("ends_at", `${day}T13:00:00Z`);
+
+docs:
+  content: |-
+    Same rules as booking, without counting this booking's own seats twice (R-EDIT-2). 409 R-EDIT-1 after the cutoff.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

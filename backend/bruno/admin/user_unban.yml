@@ -1,0 +1,20 @@
+info:
+  name: "/admin/users/:id/unban"
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/admin/users/{{user_id}}/unban"
+  auth: inherit
+
+docs:
+  content: |-
+    Admins only: run **auth / login (admin)** first.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,20 @@
+info:
+  name: "/restaurants/:id (delete)"
+  type: http
+  seq: 2
+
+http:
+  method: DELETE
+  url: "{{base_url}}/restaurants/{{restaurant_id}}"
+  auth: inherit
+
+docs:
+  content: |-
+    Cascades bookings, reviews and photos (R-REST-5). Owner only.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

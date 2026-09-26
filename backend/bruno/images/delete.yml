@@ -1,0 +1,20 @@
+info:
+  name: "/restaurants/:id/images/:imageID"
+  type: http
+  seq: 3
+
+http:
+  method: DELETE
+  url: "{{base_url}}/restaurants/{{restaurant_id}}/images/{{image_id}}"
+  auth: inherit
+
+docs:
+  content: |-
+    The last photo can't be deleted (422 R-REST-1).
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

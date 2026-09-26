@@ -1,0 +1,51 @@
+opencollection: 1.0.0
+
+info:
+  name: Restaurants
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+
+request:
+  variables:
+    - name: base_url
+      value: "{{local_url}}"
+    - name: local_url
+      value: http://localhost:8080/api
+
+docs:
+  content: |-
+    # Restaurants API
+
+    The API uses a **session cookie**, not a token. Run **auth / login** (or
+    **auth / login as admin**) first: Bruno keeps the `session` cookie and sends
+    it with every later request. Logging in as someone else replaces it.
+
+    **Run collection** works as a smoke test against `make seed` data: it signs
+    up a throwaway account, logs in as alice, creates a restaurant, books,
+    reviews, bans and unbans as admin, then deletes what it made.
+
+    Requests that create things save their IDs (`restaurant_id`,
+    `reservation_id`, `image_id`) for the next requests.
+
+    Start the API with `make api` and load demo data with `make seed`.
+    Endpoint reference: `docs/api.md`. Rule IDs in error codes: `docs/domain.md`.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git
+    presets:
+      request:
+        type: http
+        url: "{{base_url}}/"

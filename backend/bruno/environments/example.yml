@@ -1,0 +1,22 @@
+name: example
+variables:
+  - name: Duplicate-Me
+    value: Copy this file to local.yml (git-ignored) and change what you need
+  - name: email
+    value: alice@example.com
+  - name: password
+    value: password123
+  - name: admin_email
+    value: admin@example.com
+  - name: admin_password
+    value: password123
+  - name: restaurant_id
+    value: "1"
+  - name: reservation_id
+    value: "1"
+  - name: review_restaurant_id
+    value: "5"
+  - name: image_id
+    value: "1"
+  - name: user_id
+    value: "3"

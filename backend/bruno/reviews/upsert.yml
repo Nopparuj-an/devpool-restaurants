@@ -1,0 +1,27 @@
+info:
+  name: "/restaurants/:id/reviews/me (write)"
+  type: http
+  seq: 2
+
+http:
+  method: PUT
+  url: "{{base_url}}/restaurants/{{review_restaurant_id}}/reviews/me"
+  body:
+    type: json
+    data: |-
+      {
+        "rating": 5,
+        "body": "Written from Bruno."
+      }
+  auth: inherit
+
+docs:
+  content: |-
+    Targets `review_restaurant_id` (Sabai 24h Café in the seed, which alice hasn't reviewed). 201 when new, 200 when it replaces yours (one per account, R-REVIEW-2). 403 R-REVIEW-3 on your own restaurant.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

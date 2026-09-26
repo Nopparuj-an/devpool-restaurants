@@ -94,3 +94,11 @@ The customer picks pax, date, and times in their browser's timezone. The fronten
 
 - **R-PRIV-1:** The public and other customers see only an account's **display name** (e.g. on reviews).
 - **R-PRIV-2:** An owner sees **full customer info** (display name + email) for accounts that have interacted with their restaurant, meaning they reserved or reviewed. This is shown in the owner's reservation table and on reviews of their restaurant.
+
+## Admin
+
+- **R-ADMIN-1:** Admin rights are granted in the database only (`accounts.is_admin`, set with `make admin EMAIL=…`). The app has no screen to grant them. Every `/api/admin` endpoint needs an admin session (401 when logged out, 403 `admin_only` otherwise).
+- **R-ADMIN-2:** Admins can list users and restaurants (paged, searchable, filterable by active or banned), and see which restaurants a user owns.
+- **R-ADMIN-3 (ban a user):** The account can't log in with a password or Google (403 `account_banned`), and its sessions end at once. Its restaurants are hidden (R-ADMIN-4 applies to them). Its reviews are hidden and removed from every rating they counted in: `rating_sum` and `review_count` are recomputed in the same transaction. Its bookings are left as they are.
+- **R-ADMIN-4 (hidden restaurant):** A restaurant is hidden when it is banned or its owner is. Hidden restaurants aren't listed, their page and availability return 404, and they can't be booked or reviewed. Existing bookings stay and can still be cancelled. The owner and admins can still open the page, which shows why it's hidden. Hidden restaurants and banned reviewers don't count toward the Bayesian mean C (ADR-0004).
+- **R-ADMIN-5:** Bans are reversible. Unbanning clears `banned_at` and recomputes the ratings, so everything returns exactly as it was. An admin can't ban themselves or another admin (409 `R-ADMIN-5`); remove admin rights in the database first. An optional reason (max 500 characters) is shown to the owner and to admins.

@@ -1,0 +1,20 @@
+info:
+  name: "/reservations/:id/cancel"
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{base_url}}/reservations/{{reservation_id}}/cancel"
+  auth: inherit
+
+docs:
+  content: |-
+    409 R-CANCEL-1 after the restaurant's cutoff.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

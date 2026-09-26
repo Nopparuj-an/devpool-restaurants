@@ -1,0 +1,20 @@
+info:
+  name: "/restaurants/:id/availability"
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/restaurants/{{restaurant_id}}/availability"
+  auth: inherit
+
+docs:
+  content: |-
+    Seats left per 15-minute open slot. Defaults to the next 24 hours; `from`/`to` (RFC 3339, max 7 days).
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

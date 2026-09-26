@@ -54,8 +54,18 @@ All passwords are `password123`.
 | `malee@example.com` | Owns Midnight Moo Kra Ta (18:00–02:00) and Sabai 24h Café (open 24h) |
 | `alice@example.com` | Customer with upcoming and past bookings and verified reviews |
 | `bob@example.com`, `carol@example.com`, `dan@example.com` | Customers |
+| `admin@example.com` | Admin: `/admin` to list users and restaurants and ban or unban them |
+
+Admin rights are granted in the database only: `make admin EMAIL=you@example.com` (and `make admin-revoke`).
 
 ครัวริมคลอง is nearly full at lunch on the next open day, so it shows **Limited Seats Left**.
+
+## Trying the API (Bruno)
+
+`backend/bruno/` is a [Bruno](https://www.usebruno.com) collection with every endpoint. Open that folder in Bruno and pick the `example` environment (copy it to `local.yml` for your own values, which is git-ignored).
+- The API uses a session cookie, so run **auth / login** first.
+- **Run collection** works as a smoke test against `make seed` data, and cleans up after itself.
+- From the terminal: `cd backend/bruno && npx @usebruno/cli run --env example`.
 
 ## Tests
 

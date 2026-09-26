@@ -1,0 +1,24 @@
+info:
+  name: "/auth/google/start"
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/auth/google/start"
+  params:
+    - name: next
+      value: "/"
+      type: query
+  auth: inherit
+
+docs:
+  content: |-
+    Redirects to Google. Only useful in a browser: open http://localhost:3000/api/auth/google/start.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: false
+  maxRedirects: 5

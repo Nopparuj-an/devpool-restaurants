@@ -1,0 +1,33 @@
+info:
+  name: "/admin/restaurants"
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{base_url}}/admin/restaurants"
+  params:
+    - name: q
+      value: ""
+      type: query
+    - name: status
+      value: ""
+      type: query
+    - name: limit
+      value: "25"
+      type: query
+    - name: offset
+      value: "0"
+      type: query
+  auth: inherit
+
+docs:
+  content: |-
+    Admins only: run **auth / login (admin)** first. `q` matches name, cuisine or owner email.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

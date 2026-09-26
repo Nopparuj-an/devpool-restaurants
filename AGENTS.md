@@ -9,6 +9,7 @@ Restaurant reservation + review app (PEA DevPool 2026 final exam). Next.js front
 - Backend layout: **`docs/backend.md`**. Each feature is `routes.go → handler.go → service/ (rules, ports) → repository/ (SQL)`. Keep Gin out of services and SQL out of services.
 - Missing or unclear rule → add it to `docs/open-questions.md` and ask. Don't decide product behavior silently.
 - Decisions that constrain future work → new ADR in `docs/decisions/`.
+- When you add or change an API route, update `docs/api.md` **and** the Bruno collection in `backend/bruno/` (check with `npx @usebruno/cli run --env example` from that folder).
 
 ## Commands
 

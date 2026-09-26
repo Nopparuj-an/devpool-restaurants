@@ -40,6 +40,7 @@ Deadline: **2026-10-11** (submit). Interview: 2026-10-17/18. Tick items as they 
 - [x] Seed data + test accounts; README (run, accounts, env vars)
 
 - [x] Real routes wired to the API; `pnpm e2e` end-to-end check
+- [x] Admin moderation: users and restaurants, reversible bans (ADR-0012); Bruno collection
 - [x] Account settings (name, password), photo compression (browser + server), paging + server search + indexes, bulk load test (10k)
 
 ## M5 — Submit (10–11 Oct)

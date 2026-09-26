@@ -1,0 +1,20 @@
+info:
+  name: "/restaurants/:id/reservations (owner)"
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/restaurants/{{restaurant_id}}/reservations"
+  auth: inherit
+
+docs:
+  content: |-
+    Owner only. Next 7 days by default, `from`/`to` up to 31 days. Includes customer email (R-PRIV-2).
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

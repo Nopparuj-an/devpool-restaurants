@@ -1,0 +1,26 @@
+info:
+  name: "/admin/users/:id/ban"
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/admin/users/{{user_id}}/ban"
+  body:
+    type: json
+    data: |-
+      {
+        "reason": "Tested from Bruno"
+      }
+  auth: inherit
+
+docs:
+  content: |-
+    Admins only: run **auth / login (admin)** first. Ends their sessions, hides their restaurants and reviews, recomputes ratings (R-ADMIN-3). Admins and yourself: 409 R-ADMIN-5.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

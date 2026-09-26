@@ -30,6 +30,7 @@ Dependencies point inwards. Services don't import Gin or pgx, so the rules can b
 
 ```
 backend/
+  bruno/                     Bruno collection: every endpoint, runnable end to end
   cmd/
     api/main.go              start the server: config → database → server.New
     seed/main.go             demo data, through the same services as the API
@@ -48,7 +49,9 @@ backend/
       model/ service/ (validate.go = input rules)  repository/ (rules.go = the booking lock)
     reservation/             book / change / cancel, availability, owner table
       routes.go  handler.go  module.go  model/ service/ repository/
-    review/                  ratings and reviews (R-REVIEW-*)
+    review/                  ratings and reviews (R-REVIEW-*); repository has RecomputeRatings
+      routes.go  handler.go  module.go  model/ service/ repository/
+    admin/                   moderation: users, restaurants, reversible bans (R-ADMIN-*)
       routes.go  handler.go  module.go  model/ service/ repository/
     platform/                shared plumbing, no business rules
       apperr/                errors with a Kind (NotFound, Conflict, …), no HTTP
@@ -91,6 +94,8 @@ backend/
 | How an error kind maps to a status code | `platform/web/web.go` |
 | Cookies, sessions, who is logged in | `auth/middleware.go`, `auth/handler.go` |
 | Wiring a new feature in | its `module.go`, then one line in `server/server.go` |
+| Who is admin | the database: `make admin EMAIL=…` / `make admin-revoke EMAIL=…` |
+| Trying an endpoint by hand | `backend/bruno/` in Bruno. Update it whenever you change routes |
 | Demo data | `cmd/seed/main.go`; bulk load data in `cmd/seed/bulk.go` |
 | How photos are resized | `platform/imageproc` (server), `frontend/lib/image.ts` (browser) |
 
@@ -110,6 +115,8 @@ backend/
 | `GET /restaurants/:id/reservations` (owner) | `reservation/handler.go` `ListForOwner` | `reservation` `ListForOwner` |
 | `GET /me/reservations`, `GET`, `PUT /reservations/:id`, `POST …/cancel` | `reservation/handler.go` | `reservation` `ListMine`, `Get`, `Update`, `Cancel` |
 | `GET /restaurants/:id/reviews`, `GET`, `PUT`, `DELETE …/reviews/me` | `review/handler.go` | `review` `List`, `Mine`, `Upsert`, `Delete` |
+| `GET /admin/users[/:id]`, `POST …/ban`, `…/unban` | `admin/handler.go` | `admin` `ListUsers`, `GetUser`, `BanUser`, `UnbanUser` |
+| `GET /admin/restaurants`, `POST …/ban`, `…/unban` | `admin/handler.go` | `admin` `ListRestaurants`, `BanRestaurant`, `UnbanRestaurant` |
 
 Request and response shapes are in [api.md](api.md).
 
@@ -125,12 +132,16 @@ Request and response shapes are in [api.md](api.md).
 | R-REVIEW-* | `review/service/review_service.go`, plus "verified" in `review/repository` |
 | R-SEATS-1 | `booking/peak.go` `LimitedThreshold`, `reservation/service` `Availability` |
 | R-PRIV-1/2 | `reservation/service` `derive`, `review/service` `hideEmail` |
+| R-ADMIN-1 | `auth/middleware.go` `RequireAdmin`, `admin/routes.go` |
+| R-ADMIN-3 | `admin/service` `BanUser`, `auth` login (ErrBanned), `auth/repository` session query, `review/repository` `RecomputeRatings` |
+| R-ADMIN-4 | `restaurant/repository` `Visible` (lists, C), `restaurant/service` `Get`, `restaurant/repository/rules.go` `LoadRules(includeHidden)` |
+| R-ADMIN-5 | `admin/service` (guards, unban) |
 | R-TIME-* | `cmd/api/main.go` (UTC), `platform/database` (session timezone) |
 
 ## Conventions
 
 - **Errors.** Services return `apperr.Error` (Kind, Code, Message) or `booking.Violation`, and `platform/web` picks the status code. Handlers never write error JSON themselves; they `return err`.
-- **Transactions.** A service wraps work in `tx.WithinTx(ctx, …)`. Repositories call `db.Conn(ctx)`, which is the transaction when there is one. SQL never decides where a transaction starts or ends.
+- **Transactions.** A service wraps work in `tx.WithinTx(ctx, …)`. Repositories call `db.Conn(ctx)`, which is the transaction when there is one. SQL never decides where a transaction starts or ends. **Inside `WithinTx`, always use the ctx it passes in.** A closure that captures the outer ctx runs its SQL outside the transaction, and it waits forever if the transaction holds a row lock it needs. That happened once in `admin/service` and was caught by the tests.
 - **Handlers** have the signature `func(c *gin.Context) error` and are wrapped with `web.Handle` in `routes.go`.
 - **The logged-in account** comes from `auth.MustAccount(c)` behind `RequireLogin`, or `auth.ViewerID(c)` on public routes (0 = visitor).
 - **Tests.** Pure rules: `booking/booking_test.go`. Each feature's API: `<feature>/<feature>_test.go` (real HTTP and DB, run with `make test`). Google linking: `auth/service/auth_service_test.go`.

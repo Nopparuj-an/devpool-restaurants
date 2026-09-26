@@ -1,0 +1,15 @@
+info:
+  name: "/restaurants/:id/images/:imageID/cover"
+  type: http
+  seq: 2
+
+http:
+  method: PUT
+  url: "{{base_url}}/restaurants/{{restaurant_id}}/images/{{image_id}}/cover"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

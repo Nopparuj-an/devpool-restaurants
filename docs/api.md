@@ -54,6 +54,26 @@ Image URLs are relative (`/images/restaurants/…`). Next.js rewrites `/images/*
 
 Timestamps in query strings must be URL-encoded (`+07:00` → `%2B07:00`), or just send UTC `Z` times.
 
+## Admin
+Admin session required (R-ADMIN-1): 401 when logged out, 403 `admin_only` for other accounts. List queries take `?q=&status=active|banned&limit=&offset=` (limit ≤ 100, default 50).
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/admin/users` | – | `{users: AdminUser[], total}`. `q` matches email or name |
+| GET | `/admin/users/{id}` | – | AdminUser + `owned_restaurants: AdminRestaurant[]` |
+| POST | `/admin/users/{id}/ban` | `{reason?}` | AdminUser. `409 R-ADMIN-5` for yourself or an admin |
+| POST | `/admin/users/{id}/unban` | – | AdminUser |
+| GET | `/admin/restaurants` | – | `{restaurants: AdminRestaurant[], total}`. `q` matches name, cuisine or owner email. Includes hidden ones |
+| POST | `/admin/restaurants/{id}/ban` | `{reason?}` | `204` |
+| POST | `/admin/restaurants/{id}/unban` | – | `204` |
+
+**AdminUser:** `{id, email, display_name, is_admin, banned_at, ban_reason, created_at, restaurants, reviews, reservations}` (the last three are counts).
+**AdminRestaurant:** `{id, name, cuisine, location, rating, review_count, banned_at, ban_reason, created_at, owner: {id, display_name, email, banned}}`.
+
+Hidden restaurants (R-ADMIN-4) return 404 to everyone except their owner and admins. For those two, Summary and Detail carry `banned`, `owner_banned` and `ban_reason`. `Account` has `is_admin`. Logging in to a banned account returns `403 account_banned`.
+
+A Bruno collection with every endpoint is in `backend/bruno/` (see the README).
+
 ## Reviews
 | Method | Path | Body / query | Returns |
 |---|---|---|---|

@@ -1,0 +1,69 @@
+info:
+  name: "/restaurants/:id (update)"
+  type: http
+  seq: 5
+
+http:
+  method: PUT
+  url: "{{base_url}}/restaurants/{{restaurant_id}}"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Bruno Night Kitchen",
+        "description": "Updated from Bruno.",
+        "cuisine": "Thai",
+        "location": "Silom, Bangkok",
+        "seats": 16,
+        "cancel_cutoff_minutes": 60,
+        "max_reservation_minutes": 180,
+        "hours": [
+          {
+            "weekday": 0,
+            "open": "18:00",
+            "close": "02:00"
+          },
+          {
+            "weekday": 1,
+            "open": "18:00",
+            "close": "02:00"
+          },
+          {
+            "weekday": 2,
+            "open": "18:00",
+            "close": "02:00"
+          },
+          {
+            "weekday": 3,
+            "open": "18:00",
+            "close": "02:00"
+          },
+          {
+            "weekday": 4,
+            "open": "18:00",
+            "close": "02:00"
+          },
+          {
+            "weekday": 5,
+            "open": "18:00",
+            "close": "02:00"
+          },
+          {
+            "weekday": 6,
+            "open": "18:00",
+            "close": "02:00"
+          }
+        ]
+      }
+  auth: inherit
+
+docs:
+  content: |-
+    Owner only (403 R-REST-2 otherwise). Existing bookings are never changed (R-REST-4).
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,27 @@
+info:
+  name: "/auth/login (admin)"
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/auth/login"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "{{admin_email}}",
+        "password": "{{admin_password}}"
+      }
+  auth: inherit
+
+docs:
+  content: |-
+    Admin rights are granted in the database: `make admin EMAIL=…` (R-ADMIN-1).
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

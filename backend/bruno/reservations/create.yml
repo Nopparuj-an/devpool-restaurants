@@ -1,0 +1,40 @@
+info:
+  name: "/restaurants/:id/reservations (book)"
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/restaurants/{{restaurant_id}}/reservations"
+  body:
+    type: json
+    data: |-
+      {
+        "pax": 2,
+        "starts_at": "{{starts_at}}",
+        "ends_at": "{{ends_at}}"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Tomorrow 19:00 to 20:00 Bangkok time (12:00Z), on the 15-minute grid.
+        const day = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+        bru.setVar("starts_at", `${day}T12:00:00Z`);
+        bru.setVar("ends_at", `${day}T13:00:00Z`);
+    - type: after-response
+      code: |-
+        if (res.status === 201) bru.setVar("reservation_id", res.body.id);
+
+docs:
+  content: |-
+    Books tomorrow 19:00 to 20:00 (the restaurant from restaurants / create is open 18:00 to 02:00). 422 for rule breaks (R-BOOK-1…4, 8), 409 R-BOOK-5 when full. Saves `reservation_id`.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
