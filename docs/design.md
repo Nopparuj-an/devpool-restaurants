@@ -38,6 +38,9 @@ Screens take data and callbacks as props and never fetch. The design registry pa
 ## Behaviour worth knowing
 
 - **BookingPanel** offers a start time only if every 15-minute slot the booking covers has room for the party, the same rule the API enforces (R-BOOK-5). When changing a booking, it adds that booking's own seats back first (R-EDIT-2). "Limited seats left" comes from the API's per-day `limited` flag (R-SEATS-1). The API still decides. The panel only saves pointless round trips.
+- **Endless scroll**: public lists (home, reviews, My bookings, profiles) grow with `LoadMore`, which loads the next page when its "Show more" button comes near the viewport and stays clickable for keyboards. A list with another list below it (profile restaurants) loads on click only, so the one below stays reachable. Admin lists keep numbered pages.
+- **Reviews**: the star breakdown doubles as a filter (click a row, click again to clear); Newest / Oldest sorts. Counts come from the API, not from the loaded page.
+- **Bulk delete**: admins tick rows (the header box ticks the page). Admins and yourself have no box (R-ADMIN-8). The confirm dialog names what cascades.
 - **Times** are shown in the viewer's timezone. The first render uses Asia/Bangkok so server and client HTML match, then switches to the browser zone.
 - **Layout**: the restaurant page stacks intro, booking, then details on phones. On desktop the booking panel is a sticky right column.
 
@@ -47,20 +50,20 @@ UI text follows the humanizer rules: sentence case everywhere, plain words, no e
 
 ## Checking a change
 
-- `pnpm e2e` (in `frontend/`, with `make up`, `make api` and `pnpm dev` running) drives the real app in headless Chrome or Edge. It signs up, books, changes and cancels a table, writes a review, creates and edits a restaurant with photo uploads, checks the owner bookings page, and logs out. It fails on any console error, then cleans up after itself.
+- `pnpm e2e` (in `frontend/`, with `make up`, `make api` and `pnpm dev` running) drives the real app in headless Chrome or Edge. It signs up, books, changes and cancels a table, writes a review, creates and edits a restaurant with photo uploads, checks the owner bookings page, and logs out. With more than one page of data (`make seed-bulk`) it also checks endless scroll on the home page and the review star filter and sort; as admin it keeps a selection across search, page size and page changes, then deletes the run's account with it. It fails on any console error, then cleans up after itself.
 - Screens were also checked at 390 and 1280 wide for horizontal overflow.
 
 ## Pages
 
 | Route | Screen | Data |
 |---|---|---|
-| `/` | HomeScreen | `?sort=&q=&page=` all handled by the API, 24 per page |
+| `/` | HomeScreen | `?sort=&q=` handled by the API; the list grows by 24 as you scroll |
 | `/restaurants/[id]` | RestaurantScreen | `?edit=<reservation>` switches the booking panel to "Change booking" |
 | `/me/reservations` | MyBookingsScreen | login required |
 | `/me/restaurants`, `/me/restaurants/new` | MyRestaurantsScreen, RestaurantEditorScreen | login required |
 | `/me/restaurants/[id]/edit`, `/bookings` | RestaurantEditorScreen, OwnerBookingsScreen | owner or admin (`can_manage`), otherwise 404 |
 | `/users/[id]` | ProfileScreen | public; names on reviews, restaurant pages and the owner table link here |
-| `/admin/users`, `/admin/users/[id]`, `/admin/restaurants` | AdminUsersScreen, AdminUserScreen, AdminRestaurantsScreen | admins only (404 otherwise); `?q=&status=&page=`. The user page renames and impersonates |
+| `/admin/users`, `/admin/users/[id]`, `/admin/restaurants` | AdminUsersScreen, AdminUserScreen, AdminRestaurantsScreen | admins only (404 otherwise); `?q=&status=&page=&size=` (25 to 500 per page). Lists tick rows for bulk delete; the selection survives page, search and page size changes. The user page renames and impersonates |
 | `/me/account` | AccountScreen | change name; change or set a password |
 | `/login`, `/signup` | AuthScreen | `?next=` (same-site paths only), `?error=` from Google |
 

@@ -1,10 +1,14 @@
+"use client";
+
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 import { buttonClass } from "./button";
 
 // Previous / next links with "Page 2 of 17". Links (not buttons) so pages are
-// shareable and the back button works.
+// shareable and the back button works. Admin lists use it; public lists grow
+// with LoadMore instead.
 export function Pagination({
   page,
   pageCount,
@@ -38,18 +42,60 @@ export function Pagination({
   );
 }
 
-// "Show 20 more" for lists that grow in place (reviews, bookings).
-export function ShowMore({ shown, total, onMore, busy }: { shown: number; total: number; onMore: () => void; busy?: boolean }) {
-  if (shown >= total) return null;
+// Endless scroll for lists that grow in place (restaurants, reviews,
+// bookings). The next page loads when this button comes near the viewport;
+// it stays a real button for keyboards and in case the observer never fires.
+// auto={false} for a list with another list below it, which would otherwise
+// be pushed out of reach: then it loads on click only.
+export function LoadMore({
+  shown,
+  total,
+  onMore,
+  auto = true,
+}: {
+  shown: number;
+  total: number;
+  onMore: () => Promise<void>;
+  auto?: boolean;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [busy, setBusy] = useState(false);
+  const loading = useRef(false);
+  const latest = useRef(onMore);
+  useEffect(() => {
+    latest.current = onMore;
+  });
+  const more = shown < total;
+
+  async function load() {
+    if (loading.current) return;
+    loading.current = true;
+    setBusy(true);
+    try {
+      await latest.current();
+    } finally {
+      loading.current = false;
+      setBusy(false);
+    }
+  }
+
+  // A new observer after each page reports straight away whether the button
+  // is still in view (a short page), so loading goes on until it isn't.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !auto || !more || busy) return;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && load(), {
+      rootMargin: "600px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [auto, more, busy, shown]);
+
+  if (!more) return null;
   return (
-    <div className="mt-4 flex justify-center">
-      <button
-        type="button"
-        onClick={onMore}
-        disabled={busy}
-        className={buttonClass({ variant: "secondary", size: "sm" })}
-      >
-        {busy ? "Loading…" : `Show more (${total - shown} left)`}
+    <div className="mt-6 flex justify-center">
+      <button ref={ref} type="button" onClick={load} disabled={busy} className={buttonClass({ variant: "secondary", size: "sm" })}>
+        {busy ? "Loading…" : `Show more (${(total - shown).toLocaleString("en")} left)`}
       </button>
     </div>
   );

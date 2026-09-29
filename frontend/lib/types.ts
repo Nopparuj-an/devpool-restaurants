@@ -107,7 +107,10 @@ export type SortKey = "top_rated" | "most_reviewed" | "newest";
 
 // List responses carry the total number of matches for paging.
 export type RestaurantPage = { restaurants: RestaurantSummary[]; total: number };
-export type ReviewPage = { reviews: Review[]; total: number };
+// total counts the reviews matching the star filter; rating_counts has every
+// star level ("1" to "5") whatever the filter (R-REVIEW-8).
+export type ReviewPage = { reviews: Review[]; total: number; rating_counts: Record<string, number> };
+export type ReviewSort = "newest" | "oldest";
 export type ReservationPage = { reservations: Reservation[]; total: number };
 
 // Admin (R-ADMIN-*)

@@ -1,14 +1,15 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, Segmented } from "@/components/ui/controls";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Badge, Notice, Rating } from "@/components/ui/misc";
 import * as fmt from "@/lib/format";
+import { ADMIN_PAGE_SIZES } from "@/lib/paging";
 import type { AdminRestaurant, AdminStatus, AdminUser } from "@/lib/types";
 import { useTimeZone } from "@/lib/use-time-zone";
 
@@ -67,6 +68,155 @@ export function AdminFilters({
         ]}
       />
     </div>
+  );
+}
+
+// Bulk selection (R-ADMIN-8). The route keeps it across pages and filters,
+// keyed by id with the name for the confirm dialog.
+export type Selection = {
+  selected: ReadonlyMap<number, string>;
+  onSelect: (rows: { id: number; name: string }[], on: boolean) => void;
+};
+
+function Checkbox({
+  checked,
+  indeterminate = false,
+  disabled,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: (on: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.checked)}
+      className="size-4 accent-accent disabled:opacity-30"
+    />
+  );
+}
+
+// "Select all" for the rows on this page; rows elsewhere stay as they are.
+function SelectAll({ rows, selection }: { rows: { id: number; name: string }[]; selection: Selection }) {
+  const on = rows.filter((r) => selection.selected.has(r.id)).length;
+  return (
+    <Checkbox
+      label="Select all on this page"
+      checked={rows.length > 0 && on === rows.length}
+      indeterminate={on > 0 && on < rows.length}
+      disabled={rows.length === 0}
+      onChange={(v) => selection.onSelect(rows, v)}
+    />
+  );
+}
+
+// Above an admin table: what's selected (on any page), and rows per page.
+export function SelectionBar({
+  count,
+  noun,
+  pageSize,
+  onPageSize,
+  onClear,
+  onDelete,
+}: {
+  count: number;
+  noun: [string, string];
+  pageSize: number;
+  onPageSize: (size: number) => void;
+  onClear: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="mb-3 flex min-h-9 flex-wrap items-center justify-between gap-3 text-sm">
+      {count > 0 ? (
+        <span className="flex flex-wrap items-center gap-3">
+          <span className="font-medium tabular-nums">
+            {count.toLocaleString("en")} {count === 1 ? noun[0] : noun[1]} selected
+          </span>
+          <Button size="sm" variant="ghost" onClick={onClear}>
+            Clear
+          </Button>
+          <Button size="sm" variant="danger" onClick={onDelete}>
+            <Trash2 className="size-4" /> Delete
+          </Button>
+        </span>
+      ) : (
+        <span className="text-muted">Tick rows to delete them. The selection stays when you change page.</span>
+      )}
+      <label className="flex items-center gap-2 text-muted">
+        Per page
+        <Select value={pageSize} onChange={(e) => onPageSize(Number(e.target.value))} className="w-24">
+          {ADMIN_PAGE_SIZES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </Select>
+      </label>
+    </div>
+  );
+}
+
+// Deleting can't be undone, so the dialog names what goes with it.
+export function DeleteDialog({
+  kind,
+  names,
+  open,
+  onClose,
+  onConfirm,
+}: {
+  kind: "user" | "restaurant";
+  names: string[];
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<{ error?: string }>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const n = names.length;
+  const noun = kind === "user" ? (n === 1 ? "user" : "users") : n === 1 ? "restaurant" : "restaurants";
+  const shown = names.slice(0, 5).join(", ") + (n > 5 ? ` and ${(n - 5).toLocaleString("en")} more` : "");
+  return (
+    <ConfirmDialog
+      open={open}
+      title={`Delete ${n === 1 ? names[0] : `${n.toLocaleString("en")} ${noun}`}?`}
+      confirmLabel={busy ? "Deleting…" : `Delete ${noun}`}
+      danger
+      onClose={() => {
+        setError(undefined);
+        onClose();
+      }}
+      onConfirm={async () => {
+        if (busy) return;
+        setBusy(true);
+        const res = await onConfirm();
+        setBusy(false);
+        setError(res.error);
+      }}
+    >
+      <div className="flex flex-col gap-3">
+        {n > 1 && <p className="text-ink">{shown}</p>}
+        <p>
+          {kind === "user"
+            ? "Their restaurants go too, with every booking, review and photo at them, and so do their own bookings and reviews. Ratings they counted in are recalculated."
+            : "Their bookings, reviews and photos go too."}{" "}
+          This can&apos;t be undone. To hide {n === 1 ? "it" : "them"} for now, ban instead.
+        </p>
+        {error && <Notice tone="danger">{error}</Notice>}
+      </div>
+    </ConfirmDialog>
   );
 }
 
@@ -154,13 +304,30 @@ export function NameForm({ name: current, onSave }: { name: string; onSave: (nam
   );
 }
 
-export function UserTable({ users, onBan }: { users: AdminUser[]; onBan: (t: BanTarget) => void }) {
+// Admins and yourself can't be deleted (R-ADMIN-8), so they have no checkbox.
+export function UserTable({
+  users,
+  onBan,
+  selection,
+  selfId,
+}: {
+  users: AdminUser[];
+  onBan: (t: BanTarget) => void;
+  selection?: Selection;
+  selfId?: number;
+}) {
   const tz = useTimeZone();
+  const selectable = users.filter((u) => !u.is_admin && u.id !== selfId).map((u) => ({ id: u.id, name: u.display_name }));
   return (
     <div className="overflow-x-auto rounded-xl border border-line">
       <table className="w-full min-w-[48rem] text-left text-sm">
         <thead className="border-b border-line bg-surface text-muted">
           <tr>
+            {selection && (
+              <th className="w-10 py-2.5 pl-4">
+                <SelectAll rows={selectable} selection={selection} />
+              </th>
+            )}
             <th className="px-4 py-2.5 font-medium">Name</th>
             <th className="px-4 py-2.5 font-medium">Restaurants</th>
             <th className="px-4 py-2.5 font-medium">Reviews</th>
@@ -171,7 +338,18 @@ export function UserTable({ users, onBan }: { users: AdminUser[]; onBan: (t: Ban
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.id} className="border-b border-line last:border-0">
+            <tr key={u.id} className={`border-b border-line last:border-0 ${selection?.selected.has(u.id) ? "bg-accent-soft" : ""}`}>
+              {selection && (
+                <td className="py-3 pl-4">
+                  {!u.is_admin && u.id !== selfId && (
+                    <Checkbox
+                      label={`Select ${u.display_name}`}
+                      checked={selection.selected.has(u.id)}
+                      onChange={(on) => selection.onSelect([{ id: u.id, name: u.display_name }], on)}
+                    />
+                  )}
+                </td>
+              )}
               <td className="px-4 py-3">
                 <Link href={`/admin/users/${u.id}`} className="font-medium hover:text-accent">
                   {u.display_name}
@@ -208,16 +386,23 @@ export function RestaurantTable({
   restaurants,
   onBan,
   showOwner = true,
+  selection,
 }: {
   restaurants: AdminRestaurant[];
   onBan: (t: BanTarget) => void;
   showOwner?: boolean;
+  selection?: Selection;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-line">
       <table className="w-full min-w-[44rem] text-left text-sm">
         <thead className="border-b border-line bg-surface text-muted">
           <tr>
+            {selection && (
+              <th className="w-10 py-2.5 pl-4">
+                <SelectAll rows={restaurants.map((r) => ({ id: r.id, name: r.name }))} selection={selection} />
+              </th>
+            )}
             <th className="px-4 py-2.5 font-medium">Restaurant</th>
             {showOwner && <th className="px-4 py-2.5 font-medium">Owner</th>}
             <th className="px-4 py-2.5 font-medium">Rating</th>
@@ -227,7 +412,16 @@ export function RestaurantTable({
         </thead>
         <tbody>
           {restaurants.map((r) => (
-            <tr key={r.id} className="border-b border-line last:border-0">
+            <tr key={r.id} className={`border-b border-line last:border-0 ${selection?.selected.has(r.id) ? "bg-accent-soft" : ""}`}>
+              {selection && (
+                <td className="py-3 pl-4">
+                  <Checkbox
+                    label={`Select ${r.name}`}
+                    checked={selection.selected.has(r.id)}
+                    onChange={(on) => selection.onSelect([{ id: r.id, name: r.name }], on)}
+                  />
+                </td>
+              )}
               <td className="px-4 py-3">
                 <Link href={`/restaurants/${r.id}`} className="font-medium hover:text-accent">
                   {r.name}

@@ -6,8 +6,10 @@
 // reviews a restaurant, creates and edits a restaurant with photo uploads,
 // then deletes the restaurant and review it made. With an admin account
 // (E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD, default admin@example.com /
-// password123) it also bans and unbans that user and restaurant. The throwaway account and its
-// cancelled booking stay (the API has no account deletion). Failure screenshots go to $E2E_SHOTS
+// password123) it also bans and unbans that user and restaurant, and at the end deletes the
+// throwaway account through the bulk selection. It also checks endless scroll on the home
+// page and the review star filter and sort (both need more than one page of data, e.g.
+// `make seed-bulk`; otherwise they're skipped). Failure screenshots go to $E2E_SHOTS
 // (default: a temp dir).
 import { spawn } from "node:child_process";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -333,6 +335,69 @@ try {
     await evaluate(`fill("Email", "${email}"); fill("Password", "password456"); click("Log in", "button[type=submit]");
       await waitFor(() => location.pathname === "/me/reservations" && text().includes("Eve K."));`);
     return "back to ?next=";
+  });
+
+  await step("home: more restaurants load on scroll", async () => {
+    await go("/");
+    const total = await evaluate(`return (await (await fetch("/api/restaurants?limit=1")).json()).total`);
+    const cards = `new Set([...document.querySelectorAll("main a[href^='/restaurants/']")].map((a) => a.getAttribute("href"))).size`;
+    const first = await evaluate(`return await waitFor(() => ${cards})`);
+    if (total <= first) return `skipped: only ${total} restaurants`;
+    const after = await evaluate(`window.scrollTo(0, document.body.scrollHeight); return await waitFor(() => ${cards} > ${first} && ${cards})`);
+    return `${first} → ${after} of ${total} without clicking`;
+  });
+
+  await step("reviews: star breakdown, filter and sort", async () => {
+    const top = await evaluate(`return (await (await fetch("/api/restaurants?sort=most_reviewed&limit=1")).json()).restaurants[0]`);
+    if (!top || top.review_count < 2) return "skipped: no restaurant with reviews";
+    await go(`/restaurants/${top.id}`);
+    const rows = `[...document.querySelectorAll("[aria-label='Filter by rating'] button")]`;
+    // The biggest star level, so the filter has something to show.
+    const pick = await evaluate(`await waitFor(() => ${rows}.length === 5);
+      const counts = ${rows}.map((b) => Number(b.lastElementChild.textContent.replace(/,/g, "")));
+      const i = counts.indexOf(Math.max(...counts)); ${rows}[i].click(); return { stars: 5 - i, count: counts[i] }`);
+    await evaluate(`await waitFor(() => text().includes("Showing ") && text().includes("${pick.stars} star review"));
+      await waitFor(() => [...document.querySelectorAll("article [aria-label$='out of 5 stars']")].length > 0);
+      const bad = [...document.querySelectorAll("article [aria-label$='out of 5 stars']")].filter((e) => !e.getAttribute("aria-label").startsWith("${pick.stars} "));
+      if (bad.length) throw new Error(bad.length + " reviews with the wrong rating");`);
+    const order = await evaluate(`click("Oldest", "button[role=radio]");
+      await waitFor(() => byText("button[role=radio]", "Oldest").getAttribute("aria-checked") === "true");
+      const r = await (await fetch("/api/restaurants/${top.id}/reviews?rating=${pick.stars}&sort=oldest&limit=1")).json();
+      await waitFor(() => norm(document.querySelector("article p")?.textContent) === norm(r.reviews[0].body));
+      click("Show all", "button"); await waitFor(() => !text().includes("Showing ")); return r.total`);
+    await shot("reviews-filtered");
+    return `${pick.stars}★ only (${order} reviews), oldest first, then all again`;
+  });
+
+  await step("admin: select across pages, delete the account", async () => {
+    if (!asAdmin) return "skipped";
+    await evaluate(`await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "${adminEmail}", password: "${adminPassword}" }) })`);
+    await go(`/admin/users?q=${email}`);
+    // Tick the row, then change the search and page on the client: the selection stays.
+    await evaluate(`await waitFor(() => tableText().includes("${email}"));
+      document.querySelector("table tbody input[type=checkbox]").click();
+      await waitFor(() => text().includes("1 user selected"));
+      const input = document.querySelector("input[aria-label=Search]");
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await waitFor(() => !location.search.includes("q=") && document.querySelectorAll("table tbody tr").length > 1);
+      const size = [...document.querySelectorAll("select")].find((s) => s.closest("label")?.textContent.includes("Per page"));
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set.call(size, "50");
+      size.dispatchEvent(new Event("change", { bubbles: true }));
+      await waitFor(() => location.search.includes("size=50"));
+      const next = byText("a", "Next"); if (next) { next.click(); await waitFor(() => location.search.includes("page=2")); }
+      if (!text().includes("1 user selected")) throw new Error("selection lost");`);
+    const rows = await evaluate(`return document.querySelectorAll("table tbody tr").length`);
+    await evaluate(`click("Delete", "button"); await waitFor(() => document.querySelector("dialog[open]")?.textContent.includes("can't be undone"));
+      [...document.querySelectorAll("dialog[open] button")].find((b) => b.textContent.trim() === "Delete user").click();
+      await waitFor(() => !document.querySelector("dialog[open]") && !text().includes("user selected"));`);
+    await shot("admin-deleted");
+    const gone = await evaluate(`const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "${email}", password: "password456" }) }); return r.status`);
+    if (gone !== 401) throw new Error(`deleted account can still log in: ${gone}`);
+    return `kept through search, 50 per page (${rows} rows) and page 2; deleted, login now 401`;
   });
 
   console.log(problems.length ? `\nProblems:\n${problems.join("\n")}\nScreenshots: ${SHOTS}` : "\nNo console errors or exceptions.");

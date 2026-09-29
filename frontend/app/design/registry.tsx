@@ -18,7 +18,7 @@ import {
   RestaurantScreen,
 } from "@/components/screens/screens";
 import * as mock from "@/lib/mock";
-import type { SortKey } from "@/lib/types";
+import type { ReviewSort, SortKey } from "@/lib/types";
 
 import type { ScreenName } from "./screen-list";
 
@@ -50,25 +50,36 @@ function Home() {
       total={sorted.length}
       sort={sort}
       query={query}
-      page={1}
       onSort={setSort}
       onQuery={setQuery}
-      hrefForPage={() => "#"}
       limitedIds={[1]}
     />
   );
 }
+
+// Per-star counts of the mock reviews, like the API's rating_counts.
+const reviewCounts = Object.fromEntries([1, 2, 3, 4, 5].map((n) => [n, mock.reviews.filter((r) => r.rating === n).length]));
 
 function Restaurant({ asOwner, anonymous, editing }: { asOwner?: boolean; anonymous?: boolean; editing?: boolean }) {
   const loadAvailability = useCallback(async (day: string) => {
     await wait(200);
     return mock.availability(Number(day));
   }, []);
+  const [filter, setFilter] = useState<{ rating: number; sort: ReviewSort }>({ rating: 0, sort: "newest" });
+  const reviews = mock.reviews
+    .filter((r) => !filter.rating || r.rating === filter.rating)
+    .sort((a, b) => (filter.sort === "oldest" ? 1 : -1) * a.updated_at.localeCompare(b.updated_at));
+  const r = asOwner ? mock.ownedRestaurant : mock.restaurants[0];
   return (
     <RestaurantScreen
       account={anonymous ? null : asOwner ? mock.owner : mock.account}
-      restaurant={asOwner ? mock.ownedRestaurant : mock.restaurants[0]}
-      reviews={mock.reviews}
+      restaurant={{ ...r, review_count: mock.reviews.length }}
+      reviews={reviews}
+      reviewsTotal={reviews.length}
+      reviewCounts={reviewCounts}
+      reviewRating={filter.rating}
+      reviewSort={filter.sort}
+      onReviewFilter={setFilter}
       myReview={asOwner || anonymous ? undefined : mock.reviews[0]}
       days={DAYS.slice(1)}
       now={mock.MOCK_NOW}
@@ -115,6 +126,68 @@ function OwnerBookings() {
   );
 }
 
+// Admin lists with a working selection; the first row starts ticked.
+function useMockSelection(first: { id: number; name: string }) {
+  const [selected, setSelected] = useState<ReadonlyMap<number, string>>(() => new Map([[first.id, first.name]]));
+  const [pageSize, setPageSize] = useState(25);
+  return {
+    pageSize,
+    onPageSize: setPageSize,
+    selection: {
+      selected,
+      onSelect: (rows: { id: number; name: string }[], on: boolean) =>
+        setSelected((prev) => {
+          const next = new Map(prev);
+          rows.forEach((r) => (on ? next.set(r.id, r.name) : next.delete(r.id)));
+          return next;
+        }),
+    },
+    onClearSelection: () => setSelected(new Map()),
+    onDeleteSelected: async () => {
+      await wait();
+      return { error: "This is the design gallery. Nothing was deleted." };
+    },
+  };
+}
+
+function AdminUsers() {
+  const bulk = useMockSelection({ id: mock.adminUsers[0].id, name: mock.adminUsers[0].display_name });
+  return (
+    <AdminUsersScreen
+      account={mock.admin}
+      users={mock.adminUsers}
+      total={mock.adminUsers.length}
+      query=""
+      status=""
+      page={1}
+      onQuery={() => {}}
+      onStatus={() => {}}
+      hrefForPage={() => "#"}
+      onBan={done}
+      {...bulk}
+    />
+  );
+}
+
+function AdminRestaurants() {
+  const bulk = useMockSelection({ id: mock.adminRestaurants[0].id, name: mock.adminRestaurants[0].name });
+  return (
+    <AdminRestaurantsScreen
+      account={mock.admin}
+      restaurants={mock.adminRestaurants}
+      total={mock.adminRestaurants.length}
+      query=""
+      status=""
+      page={1}
+      onQuery={() => {}}
+      onStatus={() => {}}
+      hrefForPage={() => "#"}
+      onBan={done}
+      {...bulk}
+    />
+  );
+}
+
 const screens = {
   home: { render: () => <Home /> },
   restaurant: { render: () => <Restaurant /> },
@@ -140,22 +213,7 @@ const screens = {
     render: () => <RestaurantEditorScreen account={mock.owner} restaurant={mock.ownedRestaurant} onSave={ok} onDelete={done} />,
   },
   "owner-bookings": { render: () => <OwnerBookings /> },
-  "admin-users": {
-    render: () => (
-      <AdminUsersScreen
-        account={mock.admin}
-        users={mock.adminUsers}
-        total={mock.adminUsers.length}
-        query=""
-        status=""
-        page={1}
-        onQuery={() => {}}
-        onStatus={() => {}}
-        hrefForPage={() => "#"}
-        onBan={done}
-      />
-    ),
-  },
+  "admin-users": { render: () => <AdminUsers /> },
   profile: {
     render: () => (
       <ProfileScreen
@@ -188,22 +246,7 @@ const screens = {
       <AdminUserScreen account={mock.admin} user={mock.adminUserDetail} onBan={done} onRename={ok} onImpersonate={ok} />
     ),
   },
-  "admin-restaurants": {
-    render: () => (
-      <AdminRestaurantsScreen
-        account={mock.admin}
-        restaurants={mock.adminRestaurants}
-        total={mock.adminRestaurants.length}
-        query=""
-        status=""
-        page={1}
-        onQuery={() => {}}
-        onStatus={() => {}}
-        hrefForPage={() => "#"}
-        onBan={done}
-      />
-    ),
-  },
+  "admin-restaurants": { render: () => <AdminRestaurants /> },
   "restaurant-hidden": {
     render: () => <HiddenRestaurant />,
   },

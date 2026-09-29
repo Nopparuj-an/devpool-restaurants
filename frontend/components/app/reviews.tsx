@@ -1,15 +1,15 @@
 "use client";
 
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Star } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { RatingInput } from "@/components/ui/controls";
+import { RatingInput, Segmented } from "@/components/ui/controls";
 import { Textarea } from "@/components/ui/field";
 import { Notice, Stars } from "@/components/ui/misc";
 import * as fmt from "@/lib/format";
-import type { Review } from "@/lib/types";
+import type { Review, ReviewSort } from "@/lib/types";
 import { useTimeZone } from "@/lib/use-time-zone";
 
 export function ReviewItem({ review: r }: { review: Review }) {
@@ -34,6 +34,64 @@ export function ReviewItem({ review: r }: { review: Review }) {
       </div>
       <p className="text-sm leading-relaxed">{r.body}</p>
     </article>
+  );
+}
+
+// How many reviews have each star rating (R-REVIEW-8). Each row is a filter:
+// click it to show only those reviews, click it again to show all.
+export function ReviewBreakdown({
+  counts,
+  total,
+  rating,
+  onRating,
+}: {
+  counts: Record<string, number>;
+  total: number;
+  rating: number; // 0 = all
+  onRating: (rating: number) => void;
+}) {
+  return (
+    <div className="flex max-w-sm flex-col gap-1" role="group" aria-label="Filter by rating">
+      {[5, 4, 3, 2, 1].map((n) => {
+        const count = counts[n] ?? 0;
+        const on = rating === n;
+        return (
+          <button
+            key={n}
+            type="button"
+            aria-pressed={on}
+            disabled={count === 0 && !on}
+            onClick={() => onRating(on ? 0 : n)}
+            className={`flex items-center gap-3 rounded-md px-2 py-1 text-sm transition-colors disabled:opacity-40 ${
+              on ? "bg-accent-soft font-medium" : "enabled:hover:bg-surface"
+            }`}
+          >
+            <span className="inline-flex w-7 items-center gap-0.5 tabular-nums">
+              {n}
+              <Star className="size-3 fill-accent text-accent" aria-hidden />
+            </span>
+            <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface">
+              <span className="block h-full rounded-full bg-accent" style={{ width: `${total ? (count / total) * 100 : 0}%` }} />
+            </span>
+            <span className="w-10 text-right text-muted tabular-nums">{count.toLocaleString("en")}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ReviewSortControl({ value, onChange }: { value: ReviewSort; onChange: (sort: ReviewSort) => void }) {
+  return (
+    <Segmented
+      label="Sort reviews"
+      value={value}
+      onChange={onChange}
+      options={[
+        { value: "newest", label: "Newest" },
+        { value: "oldest", label: "Oldest" },
+      ]}
+    />
   );
 }
 

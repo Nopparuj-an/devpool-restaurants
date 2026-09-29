@@ -11,11 +11,14 @@ import {
   AdminFilters,
   AdminTabs,
   BanDialog,
+  DeleteDialog,
   NameForm,
   RestaurantTable,
+  SelectionBar,
   StatusBadge,
   UserTable,
   type BanTarget,
+  type Selection,
 } from "@/components/app/admin";
 import { AuthForm, type AuthInput } from "@/components/app/auth-form";
 import { BookingPanel, DayTabs, type BookingInput } from "@/components/app/booking-panel";
@@ -24,13 +27,13 @@ import { ReservationCard } from "@/components/app/reservation-card";
 import { RestaurantCard } from "@/components/app/restaurant-card";
 import { RestaurantForm, type PhotoItem, type RestaurantInput } from "@/components/app/restaurant-form";
 import { Gallery, HoursList } from "@/components/app/restaurant-info";
-import { ReviewForm, ReviewItem } from "@/components/app/reviews";
+import { ReviewBreakdown, ReviewForm, ReviewItem, ReviewSortControl } from "@/components/app/reviews";
 import { Page, PageTitle, SiteHeader } from "@/components/app/site-header";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { ConfirmDialog, Segmented } from "@/components/ui/controls";
 import { Input } from "@/components/ui/field";
 import { Badge, EmptyState, Notice, Photo, Rating, Stars } from "@/components/ui/misc";
-import { Pagination, ShowMore } from "@/components/ui/pagination";
+import { LoadMore, Pagination } from "@/components/ui/pagination";
 import * as fmt from "@/lib/format";
 import type {
   Account,
@@ -45,9 +48,9 @@ import type {
   Profile,
   ProfileReview,
   Review,
+  ReviewSort,
   SortKey,
 } from "@/lib/types";
-import { ADMIN_PAGE_SIZE, HOME_PAGE_SIZE } from "@/lib/paging";
 import { useTimeZone } from "@/lib/use-time-zone";
 
 type Result = Promise<{ error?: string }>;
@@ -60,17 +63,17 @@ const SORTS: { value: SortKey; label: string }[] = [
 ];
 
 // Search, sort and paging all happen on the server; the screen reports
-// changes and the route turns them into ?q=&sort=&page=.
+// changes and the route turns them into ?q=&sort=. The list grows as you
+// scroll (onMore loads the next page).
 export function HomeScreen({
   account,
   restaurants,
   total,
   sort,
   query,
-  page,
   onSort,
   onQuery,
-  hrefForPage,
+  onMore,
   limitedIds = [],
 }: {
   account: Account | null;
@@ -78,10 +81,9 @@ export function HomeScreen({
   total: number;
   sort: SortKey;
   query: string;
-  page: number;
   onSort: (sort: SortKey) => void;
   onQuery: (query: string) => void;
-  hrefForPage: (page: number) => string;
+  onMore?: () => Promise<void>;
   limitedIds?: number[];
 }) {
   const [text, setText] = useState(query);
@@ -128,7 +130,7 @@ export function HomeScreen({
             ))}
           </div>
         )}
-        <Pagination page={page} pageCount={Math.ceil(total / HOME_PAGE_SIZE)} hrefFor={hrefForPage} />
+        {onMore && <LoadMore shown={restaurants.length} total={total} onMore={onMore} />}
       </Page>
     </>
   );
@@ -149,6 +151,10 @@ export function RestaurantScreen({
   initialDay,
   reviewsTotal,
   onMoreReviews,
+  reviewCounts,
+  reviewRating = 0,
+  reviewSort = "newest",
+  onReviewFilter,
   onAdminBan,
 }: {
   account: Account | null;
@@ -156,9 +162,14 @@ export function RestaurantScreen({
   // Admins get ban / unban here too (R-ADMIN-4).
   onAdminBan?: (target: BanTarget) => void;
   reviews: Review[];
-  // All reviews count; `reviews` may be the first page only.
+  // Reviews matching the filter; `reviews` may be the first pages only.
   reviewsTotal?: number;
   onMoreReviews?: () => Promise<void>;
+  // Per-star counts and the filter / sort they drive (R-REVIEW-8).
+  reviewCounts?: Record<string, number>;
+  reviewRating?: number;
+  reviewSort?: ReviewSort;
+  onReviewFilter?: (f: { rating: number; sort: ReviewSort }) => void;
   myReview?: Review;
   days: Day[];
   now: string;
@@ -170,7 +181,6 @@ export function RestaurantScreen({
   initialDay?: string;
 }) {
   const others = reviews.filter((rv) => rv.id !== myReview?.id);
-  const [loadingMore, setLoadingMore] = useState(false);
   return (
     <>
       <SiteHeader account={account} current="/" />
@@ -269,32 +279,42 @@ export function RestaurantScreen({
               </section>
 
               <section className="flex flex-col gap-4">
-                <h2 className="font-semibold">Reviews</h2>
+                <h2 className="font-semibold">
+                  Reviews {r.review_count > 0 && <span className="font-normal text-muted">({r.review_count.toLocaleString("en")})</span>}
+                </h2>
+                {reviewCounts && onReviewFilter && r.review_count > 0 && (
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <ReviewBreakdown
+                      counts={reviewCounts}
+                      total={r.review_count}
+                      rating={reviewRating}
+                      onRating={(rating) => onReviewFilter({ rating, sort: reviewSort })}
+                    />
+                    <ReviewSortControl value={reviewSort} onChange={(sort) => onReviewFilter({ rating: reviewRating, sort })} />
+                  </div>
+                )}
                 <ReviewForm
                   mode={!account ? "anonymous" : r.is_owner ? "owner" : "customer"}
                   existing={myReview}
                   onSave={onSaveReview}
                   onDelete={onDeleteReview}
                 />
+                {reviewRating > 0 && (
+                  <p className="text-sm text-muted">
+                    Showing {fmt.count(reviewsTotal ?? others.length, `${reviewRating} star review`)}.{" "}
+                    <button type="button" className="text-accent hover:underline" onClick={() => onReviewFilter?.({ rating: 0, sort: reviewSort })}>
+                      Show all
+                    </button>
+                  </p>
+                )}
                 {others.length === 0 ? (
-                  <p className="text-sm text-muted">No reviews yet.</p>
+                  <p className="text-sm text-muted">{reviewRating > 0 ? "No other reviews with that rating." : "No reviews yet."}</p>
                 ) : (
                   <div>
                     {others.map((rv) => (
                       <ReviewItem key={rv.id} review={rv} />
                     ))}
-                    {onMoreReviews && (
-                      <ShowMore
-                        shown={reviews.length}
-                        total={reviewsTotal ?? reviews.length}
-                        busy={loadingMore}
-                        onMore={async () => {
-                          setLoadingMore(true);
-                          await onMoreReviews();
-                          setLoadingMore(false);
-                        }}
-                      />
-                    )}
+                    {onMoreReviews && <LoadMore shown={reviews.length} total={reviewsTotal ?? reviews.length} onMore={onMoreReviews} />}
                   </div>
                 )}
               </section>
@@ -324,7 +344,6 @@ export function MyBookingsScreen({
 }) {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [cancelling, setCancelling] = useState<Reservation | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
   const tz = useTimeZone();
   const upcoming = reservations.filter((r) => r.state === "upcoming" || r.state === "in_progress");
   const past = reservations.filter((r) => r.state === "completed" || r.state === "cancelled");
@@ -357,18 +376,7 @@ export function MyBookingsScreen({
             ))}
           </div>
         )}
-        {tab === "past" && onMore && (
-          <ShowMore
-            shown={reservations.length}
-            total={total ?? reservations.length}
-            busy={loadingMore}
-            onMore={async () => {
-              setLoadingMore(true);
-              await onMore();
-              setLoadingMore(false);
-            }}
-          />
-        )}
+        {tab === "past" && onMore && <LoadMore shown={reservations.length} total={total ?? reservations.length} onMore={onMore} />}
         <ConfirmDialog
           open={cancelling !== null}
           title="Cancel this booking?"
@@ -578,11 +586,51 @@ type AdminListProps = {
   query: string;
   status: AdminStatus;
   page: number;
+  pageSize: number;
   onQuery: (q: string) => void;
   onStatus: (s: AdminStatus) => void;
+  onPageSize: (size: number) => void;
   hrefForPage: (page: number) => string;
   onBan: (target: BanTarget, reason: string) => Promise<void>;
+  // Bulk delete (R-ADMIN-8): the selection spans pages and filters.
+  selection: Selection;
+  onClearSelection: () => void;
+  onDeleteSelected: () => Result;
 };
+
+// The selection bar, the delete dialog, and the page links for an admin list.
+function useBulkDelete(p: AdminListProps, kind: "user" | "restaurant") {
+  const [confirming, setConfirming] = useState(false);
+  const noun: [string, string] = kind === "user" ? ["user", "users"] : ["restaurant", "restaurants"];
+  return {
+    bar: (
+      <SelectionBar
+        count={p.selection.selected.size}
+        noun={noun}
+        pageSize={p.pageSize}
+        onPageSize={p.onPageSize}
+        onClear={p.onClearSelection}
+        onDelete={() => setConfirming(true)}
+      />
+    ),
+    footer: (
+      <>
+        <Pagination page={p.page} pageCount={Math.ceil(p.total / p.pageSize)} hrefFor={p.hrefForPage} />
+        <DeleteDialog
+          kind={kind}
+          names={[...p.selection.selected.values()]}
+          open={confirming}
+          onClose={() => setConfirming(false)}
+          onConfirm={async () => {
+            const res = await p.onDeleteSelected();
+            if (!res.error) setConfirming(false);
+            return res;
+          }}
+        />
+      </>
+    ),
+  };
+}
 
 // One ban dialog per screen; tables only say which row was clicked.
 function useBan(onBan: (target: BanTarget, reason: string) => Promise<void>) {
@@ -602,6 +650,7 @@ function useBan(onBan: (target: BanTarget, reason: string) => Promise<void>) {
 
 export function AdminUsersScreen({ users, ...p }: AdminListProps & { users: AdminUser[] }) {
   const ban = useBan(p.onBan);
+  const bulk = useBulkDelete(p, "user");
   return (
     <>
       <SiteHeader account={p.account} current="/admin" />
@@ -609,8 +658,13 @@ export function AdminUsersScreen({ users, ...p }: AdminListProps & { users: Admi
         <PageTitle title="Admin" subtitle={`${p.total.toLocaleString("en")} ${p.total === 1 ? "user" : "users"}`} />
         <AdminTabs current="users" />
         <AdminFilters query={p.query} status={p.status} placeholder="Search by name or email" onQuery={p.onQuery} onStatus={p.onStatus} />
-        {users.length === 0 ? <EmptyState title="No users match" /> : <UserTable users={users} onBan={ban.open} />}
-        <Pagination page={p.page} pageCount={Math.ceil(p.total / ADMIN_PAGE_SIZE)} hrefFor={p.hrefForPage} />
+        {bulk.bar}
+        {users.length === 0 ? (
+          <EmptyState title="No users match" />
+        ) : (
+          <UserTable users={users} onBan={ban.open} selection={p.selection} selfId={p.account.id} />
+        )}
+        {bulk.footer}
         {ban.dialog}
       </Page>
     </>
@@ -619,6 +673,7 @@ export function AdminUsersScreen({ users, ...p }: AdminListProps & { users: Admi
 
 export function AdminRestaurantsScreen({ restaurants, ...p }: AdminListProps & { restaurants: AdminRestaurant[] }) {
   const ban = useBan(p.onBan);
+  const bulk = useBulkDelete(p, "restaurant");
   return (
     <>
       <SiteHeader account={p.account} current="/admin" />
@@ -626,8 +681,13 @@ export function AdminRestaurantsScreen({ restaurants, ...p }: AdminListProps & {
         <PageTitle title="Admin" subtitle={`${p.total.toLocaleString("en")} ${p.total === 1 ? "restaurant" : "restaurants"}`} />
         <AdminTabs current="restaurants" />
         <AdminFilters query={p.query} status={p.status} placeholder="Search by name, cuisine or owner email" onQuery={p.onQuery} onStatus={p.onStatus} />
-        {restaurants.length === 0 ? <EmptyState title="No restaurants match" /> : <RestaurantTable restaurants={restaurants} onBan={ban.open} />}
-        <Pagination page={p.page} pageCount={Math.ceil(p.total / ADMIN_PAGE_SIZE)} hrefFor={p.hrefForPage} />
+        {bulk.bar}
+        {restaurants.length === 0 ? (
+          <EmptyState title="No restaurants match" />
+        ) : (
+          <RestaurantTable restaurants={restaurants} onBan={ban.open} selection={p.selection} />
+        )}
+        {bulk.footer}
         {ban.dialog}
       </Page>
     </>
@@ -758,12 +818,6 @@ export function ProfileScreen({
   onMoreReviews?: () => Promise<void>;
 }) {
   const tz = useTimeZone();
-  const [busy, setBusy] = useState<"restaurants" | "reviews" | null>(null);
-  async function more(which: "restaurants" | "reviews", load?: () => Promise<void>) {
-    setBusy(which);
-    await load?.();
-    setBusy(null);
-  }
   const self = account?.id === p.id;
   return (
     <>
@@ -807,12 +861,10 @@ export function ProfileScreen({
                 <RestaurantCard key={r.id} restaurant={r} />
               ))}
             </div>
-            <ShowMore
-              shown={restaurants.length}
-              total={restaurantsTotal}
-              busy={busy === "restaurants"}
-              onMore={() => more("restaurants", onMoreRestaurants)}
-            />
+            {onMoreRestaurants && (
+              // Reviews come below, so this list grows on click only.
+              <LoadMore shown={restaurants.length} total={restaurantsTotal} onMore={onMoreRestaurants} auto={false} />
+            )}
           </section>
         )}
 
@@ -853,12 +905,7 @@ export function ProfileScreen({
                   </div>
                 </article>
               ))}
-              <ShowMore
-                shown={reviews.length}
-                total={reviewsTotal}
-                busy={busy === "reviews"}
-                onMore={() => more("reviews", onMoreReviews)}
-              />
+              {onMoreReviews && <LoadMore shown={reviews.length} total={reviewsTotal} onMore={onMoreReviews} />}
             </div>
           )}
         </section>

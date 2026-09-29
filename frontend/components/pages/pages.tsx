@@ -17,7 +17,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import type { AuthInput } from "@/components/app/auth-form";
 import type { BookingInput } from "@/components/app/booking-panel";
 import type { PhotoItem, RestaurantInput } from "@/components/app/restaurant-form";
-import { BanDialog, type BanTarget } from "@/components/app/admin";
+import { BanDialog, type BanTarget, type Selection } from "@/components/app/admin";
 import { NotFoundView, PageError, PageLoading } from "@/components/app/states";
 import {
   AccountScreen,
@@ -35,7 +35,14 @@ import {
 } from "@/components/screens/screens";
 import { api, ApiError, get, getOrNull } from "@/lib/api-client";
 import { dayKey, dayRange, upcomingDays } from "@/lib/days";
-import { ADMIN_PAGE_SIZE, BOOKINGS_PAGE_SIZE, HOME_PAGE_SIZE, REVIEWS_PAGE_SIZE } from "@/lib/paging";
+import {
+  ADMIN_DELETE_CHUNK,
+  ADMIN_PAGE_SIZE,
+  ADMIN_PAGE_SIZES,
+  BOOKINGS_PAGE_SIZE,
+  HOME_PAGE_SIZE,
+  REVIEWS_PAGE_SIZE,
+} from "@/lib/paging";
 import { keys, useAccount, useRefresh, useRequireAccount } from "@/lib/queries";
 import type {
   Account,
@@ -54,6 +61,7 @@ import type {
   RestaurantSummary,
   Review,
   ReviewPage,
+  ReviewSort,
   SortKey,
 } from "@/lib/types";
 import { useTimeZone } from "@/lib/use-time-zone";
@@ -109,33 +117,33 @@ function useIdParam() {
 
 const SORTS: SortKey[] = ["top_rated", "most_reviewed", "newest"];
 
-// ?sort=&q=&page= are all handled by the API, so the list scales to any size.
+// ?sort=&q= are handled by the API, so the list scales to any size. It grows
+// as you scroll, HOME_PAGE_SIZE at a time.
 export function HomeRoute() {
   const router = useRouter();
   const params = useSearchParams();
   const sort = SORTS.includes(params.get("sort") as SortKey) ? (params.get("sort") as SortKey) : "top_rated";
   const query = (params.get("q") ?? "").trim().slice(0, 100);
-  const page = Math.max(1, Math.floor(Number(params.get("page"))) || 1);
 
-  const apiParams = new URLSearchParams({ sort, limit: String(HOME_PAGE_SIZE), offset: String((page - 1) * HOME_PAGE_SIZE) });
+  const apiParams = new URLSearchParams({ sort, limit: String(HOME_PAGE_SIZE) });
   if (query) apiParams.set("q", query);
   const me = useAccount();
-  const list = useQuery({
+  const list = useInfiniteQuery({
     queryKey: keys.restaurants(String(apiParams)),
-    queryFn: () => get<RestaurantPage>(`/restaurants?${apiParams}`),
-    // Keep the current page on screen while the next one loads.
+    queryFn: ({ pageParam }) => get<RestaurantPage>(`/restaurants?${apiParams}&offset=${pageParam}`),
+    initialPageParam: 0,
+    getNextPageParam: nextOffset<RestaurantPage>((p) => p.restaurants),
+    // Keep the current list on screen while a new search or sort loads.
     placeholderData: keepPreviousData,
   });
 
-  // Changing search or sort starts again at page 1.
   const href = useCallback(
-    (p: { sort?: SortKey; query?: string; page?: number }) => {
+    (p: { sort?: SortKey; query?: string }) => {
       const q = new URLSearchParams();
       const nextSort = p.sort ?? sort;
       const nextQuery = p.query ?? query;
       if (nextSort !== "top_rated") q.set("sort", nextSort);
       if (nextQuery) q.set("q", nextQuery);
-      if (p.page && p.page > 1) q.set("page", String(p.page));
       return q.size ? `/?${q}` : "/";
     },
     [sort, query],
@@ -144,17 +152,19 @@ export function HomeRoute() {
 
   const wait = gate(me, list);
   if (wait) return wait;
+  const pages = list.data!.pages;
   return (
     <HomeScreen
       account={me.data ?? null}
-      restaurants={list.data!.restaurants}
-      total={list.data!.total}
+      restaurants={unique(pages.flatMap((p) => p.restaurants))}
+      total={pages[0].total}
       sort={sort}
       query={query}
-      page={page}
       onSort={(s) => router.push(href({ sort: s }))}
       onQuery={onQuery}
-      hrefForPage={(p) => href({ page: p })}
+      onMore={async () => {
+        await list.fetchNextPage();
+      }}
     />
   );
 }
@@ -173,11 +183,17 @@ export function RestaurantRoute() {
     queryKey: keys.restaurant(id),
     queryFn: () => get<RestaurantDetail>(`/restaurants/${id}`),
   });
+  // One star rating or all, newest or oldest first (R-REVIEW-8).
+  const [reviewFilter, setReviewFilter] = useState<{ rating: number; sort: ReviewSort }>({ rating: 0, sort: "newest" });
+  const reviewParams = new URLSearchParams({ limit: String(REVIEWS_PAGE_SIZE), sort: reviewFilter.sort });
+  if (reviewFilter.rating) reviewParams.set("rating", String(reviewFilter.rating));
   const reviews = useInfiniteQuery({
-    queryKey: keys.reviews(id),
-    queryFn: ({ pageParam }) => get<ReviewPage>(`/restaurants/${id}/reviews?limit=${REVIEWS_PAGE_SIZE}&offset=${pageParam}`),
+    queryKey: keys.reviews(id, String(reviewParams)),
+    queryFn: ({ pageParam }) => get<ReviewPage>(`/restaurants/${id}/reviews?${reviewParams}&offset=${pageParam}`),
     initialPageParam: 0,
     getNextPageParam: nextOffset<ReviewPage>((p) => p.reviews),
+    // Keep the page (not a spinner) on screen while a new filter loads.
+    placeholderData: keepPreviousData,
   });
   const myReview = useQuery({
     queryKey: keys.myReview(id),
@@ -209,6 +225,9 @@ export function RestaurantRoute() {
       onMoreReviews={async () => {
         await reviews.fetchNextPage();
       }}
+      reviewCounts={pages[pages.length - 1].rating_counts}
+      reviewFilter={reviewFilter}
+      onReviewFilter={setReviewFilter}
       myReview={myReview.data ?? undefined}
       editing={e && e.restaurant.id === r.id && e.can_modify ? e : undefined}
     />
@@ -221,6 +240,9 @@ function RestaurantView({
   reviews,
   reviewsTotal,
   onMoreReviews,
+  reviewCounts,
+  reviewFilter,
+  onReviewFilter,
   myReview,
   editing,
 }: {
@@ -229,6 +251,9 @@ function RestaurantView({
   reviews: Review[];
   reviewsTotal: number;
   onMoreReviews: () => Promise<void>;
+  reviewCounts: Record<string, number>;
+  reviewFilter: { rating: number; sort: ReviewSort };
+  onReviewFilter: (f: { rating: number; sort: ReviewSort }) => void;
   myReview?: Review;
   editing?: Reservation;
 }) {
@@ -281,6 +306,10 @@ function RestaurantView({
         reviews={reviews}
         reviewsTotal={reviewsTotal}
         onMoreReviews={onMoreReviews}
+        reviewCounts={reviewCounts}
+        reviewRating={reviewFilter.rating}
+        reviewSort={reviewFilter.sort}
+        onReviewFilter={onReviewFilter}
         myReview={myReview}
         days={days}
         now={now.toISOString()}
@@ -588,7 +617,9 @@ function useBanAction() {
   );
 }
 
-// ?q=&status=&page= for an admin list; changing search or status restarts at page 1.
+// ?q=&status=&page=&size= for an admin list; changing search or status
+// restarts at page 1. The selection lives in the route, so it survives all of
+// these (R-ADMIN-8).
 function useAdminList(base: string) {
   const router = useRouter();
   const params = useSearchParams();
@@ -596,32 +627,80 @@ function useAdminList(base: string) {
   const rawStatus = params.get("status");
   const status: AdminStatus = rawStatus === "active" || rawStatus === "banned" ? rawStatus : "";
   const page = Math.max(1, Math.floor(Number(params.get("page"))) || 1);
+  const rawSize = Number(params.get("size"));
+  const pageSize = (ADMIN_PAGE_SIZES as readonly number[]).includes(rawSize) ? rawSize : ADMIN_PAGE_SIZE;
 
-  const apiParams = new URLSearchParams({ limit: String(ADMIN_PAGE_SIZE), offset: String((page - 1) * ADMIN_PAGE_SIZE) });
+  const apiParams = new URLSearchParams({ limit: String(pageSize), offset: String((page - 1) * pageSize) });
   if (query) apiParams.set("q", query);
   if (status) apiParams.set("status", status);
 
   const href = useCallback(
-    (p: { query?: string; status?: AdminStatus; page?: number }) => {
+    (p: { query?: string; status?: AdminStatus; page?: number; size?: number }) => {
       const q = new URLSearchParams();
       const nextQuery = p.query ?? query;
       const nextStatus = p.status ?? status;
+      const nextSize = p.size ?? pageSize;
       if (nextQuery) q.set("q", nextQuery);
       if (nextStatus) q.set("status", nextStatus);
       if (p.page && p.page > 1) q.set("page", String(p.page));
+      if (nextSize !== ADMIN_PAGE_SIZE) q.set("size", String(nextSize));
       return q.size ? `${base}?${q}` : base;
     },
-    [base, query, status],
+    [base, query, status, pageSize],
   );
   return {
     apiParams: String(apiParams),
-    list: { query, status, page },
+    list: { query, status, page, pageSize },
     nav: {
       onQuery: useCallback((q: string) => router.replace(href({ query: q })), [router, href]),
       onStatus: (s: AdminStatus) => router.push(href({ status: s })),
+      // Stay on the page that holds the first row shown now.
+      onPageSize: (size: number) => router.push(href({ size, page: Math.floor(((page - 1) * pageSize) / size) + 1 })),
       hrefForPage: (p: number) => href({ page: p }),
     },
   };
+}
+
+// After a delete the current page can end up past the last one: go to the last.
+function usePageInRange(page: number, pageSize: number, total: number | undefined, hrefForPage: (p: number) => string) {
+  const router = useRouter();
+  const last = Math.max(1, Math.ceil((total ?? 0) / pageSize));
+  useEffect(() => {
+    if (total !== undefined && page > last) router.replace(hrefForPage(last));
+  }, [total, page, last, router, hrefForPage]);
+}
+
+// Rows ticked on any page, by id, with the name for the confirm dialog.
+function useSelection(kind: "users" | "restaurants") {
+  const refresh = useRefresh();
+  const [selected, setSelected] = useState<ReadonlyMap<number, string>>(() => new Map());
+  const onSelect = useCallback((rows: { id: number; name: string }[], on: boolean) => {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      for (const r of rows) {
+        if (on) next.set(r.id, r.name);
+        else next.delete(r.id);
+      }
+      return next;
+    });
+  }, []);
+  const selection: Selection = { selected, onSelect };
+
+  // The API takes ADMIN_DELETE_CHUNK ids per request. Chunks that went
+  // through leave the selection even if a later one fails.
+  async function onDeleteSelected() {
+    const ids = [...selected.keys()];
+    let error: string | undefined;
+    for (let i = 0; i < ids.length && !error; i += ADMIN_DELETE_CHUNK) {
+      const chunk = ids.slice(i, i + ADMIN_DELETE_CHUNK);
+      const res = await api("POST", `/admin/${kind}/delete`, { ids: chunk });
+      if (res.error) error = res.error;
+      else onSelect(chunk.map((id) => ({ id, name: "" })), false);
+    }
+    await refresh();
+    return { error };
+  }
+  return { selection, onClearSelection: () => setSelected(new Map()), onDeleteSelected };
 }
 
 // Admin pages 404 for everyone else (the API also refuses, R-ADMIN-1).
@@ -641,10 +720,20 @@ export function AdminUsersRoute() {
     placeholderData: keepPreviousData,
   });
   const ban = useBanAction();
+  const bulk = useSelection("users");
+  usePageInRange(list.page, list.pageSize, users.data?.total, nav.hrefForPage);
   const wait = gateAdmin(me, users);
   if (wait) return wait;
   return (
-    <AdminUsersScreen account={me.data!} {...list} {...nav} users={users.data!.users} total={users.data!.total} onBan={ban} />
+    <AdminUsersScreen
+      account={me.data!}
+      {...list}
+      {...nav}
+      {...bulk}
+      users={users.data!.users}
+      total={users.data!.total}
+      onBan={ban}
+    />
   );
 }
 
@@ -658,6 +747,8 @@ export function AdminRestaurantsRoute() {
     placeholderData: keepPreviousData,
   });
   const ban = useBanAction();
+  const bulk = useSelection("restaurants");
+  usePageInRange(list.page, list.pageSize, restaurants.data?.total, nav.hrefForPage);
   const wait = gateAdmin(me, restaurants);
   if (wait) return wait;
   return (
@@ -665,6 +756,7 @@ export function AdminRestaurantsRoute() {
       account={me.data!}
       {...list}
       {...nav}
+      {...bulk}
       restaurants={restaurants.data!.restaurants}
       total={restaurants.data!.total}
       onBan={ban}

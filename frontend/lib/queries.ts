@@ -37,7 +37,7 @@ export const keys = {
   providers: ["auth", "providers"] as const,
   restaurants: (params: string) => ["restaurants", params] as const,
   restaurant: (id: number) => ["restaurant", id] as const,
-  reviews: (id: number) => ["restaurant", id, "reviews"] as const,
+  reviews: (id: number, params: string) => ["restaurant", id, "reviews", params] as const,
   myReview: (id: number) => ["restaurant", id, "my-review"] as const,
   ownerDay: (id: number, from: string, to: string) => ["restaurant", id, "owner-day", from, to] as const,
   reservation: (id: number) => ["reservation", id] as const,
