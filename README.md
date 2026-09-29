@@ -77,6 +77,12 @@ make test
 - API integration tests run against a throwaway database on the compose Postgres, one per test. They include the brief's seat examples and a lock test that fails if the booking row lock is removed.
 - UI: `cd frontend && pnpm e2e` drives the real app in headless Chrome or Edge (sign up, book, change, cancel, review, create and edit a restaurant, log out). It needs the dev setup running.
 
+### CI (GitHub Actions)
+
+- `.github/workflows/ci.yml`: gofmt, `go vet`, build, and `go test -race` against a Postgres service container (the Garage test skips itself), plus frontend lint, `tsc`, and `next build`.
+- `.github/workflows/security.yml`, on every push/PR and weekly: CodeQL (Go, TS, Actions), gitleaks over full history, govulncheck, `pnpm audit --prod`, and Trivy (deps, secrets, Dockerfile misconfig; HIGH/CRITICAL only).
+- `.github/dependabot.yml`: weekly update PRs for Go modules, npm, Docker base images, and Actions.
+
 ## Layout
 
 ```

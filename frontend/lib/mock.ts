@@ -43,7 +43,7 @@ export const account: Account = {
 // Signed up with Google and never set a password.
 export const googleAccount: Account = {
   id: 9,
-  email: "nok@gmail.com",
+  email: "nok@example.com",
   display_name: "Nok",
   email_verified: true,
   has_password: false,
@@ -326,7 +326,7 @@ const ago = (days: number) => bkk(-days, "10:00");
 
 export const adminUsers: AdminUser[] = [
   { id: 12, email: "spammer@example.com", display_name: "Best Deals 4 U", is_admin: false, banned_at: ago(1), ban_reason: "Posted ads as reviews", created_at: ago(2), restaurants: 0, reviews: 14, reservations: 0 },
-  { id: 9, email: "nok@gmail.com", display_name: "Nok", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(5), restaurants: 0, reviews: 2, reservations: 3 },
+  { id: 9, email: "nok@example.com", display_name: "Nok", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(5), restaurants: 0, reviews: 2, reservations: 3 },
   { id: 7, email: "admin@example.com", display_name: "Admin", is_admin: true, banned_at: null, ban_reason: "", created_at: ago(20), restaurants: 0, reviews: 0, reservations: 0 },
   { id: 2, email: "malee@example.com", display_name: "Malee", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(30), restaurants: 2, reviews: 0, reservations: 0 },
   { id: 1, email: "somchai@example.com", display_name: "Somchai", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(31), restaurants: 3, reviews: 0, reservations: 1 },
