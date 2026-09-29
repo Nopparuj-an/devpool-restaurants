@@ -8,7 +8,7 @@ HOST_ENV = set -a && . ../$(ENV_FILE) && set +a && \
 	  export DATABASE_URL="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/$$POSTGRES_DB?sslmode=disable" \
 	  S3_ENDPOINT=http://localhost:3900 COOKIE_SECURE=false
 
-.PHONY: help env up down ps logs garage-init psql admin admin-revoke api seed seed-bulk seed-bulk-remove test fmt vet app-up app-down app-logs app-seed
+.PHONY: help env up down ps logs garage-init psql admin admin-revoke api seed seed-bulk seed-bulk-remove ratings-recompute test fmt vet app-up app-down app-logs app-seed
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -53,7 +53,7 @@ seed: ## Load demo accounts, restaurants, bookings, reviews (no-op if already se
 	cd backend && $(HOST_ENV) && go run ./cmd/seed
 
 N ?= 1000
-seed-bulk: ## Add N generated users + restaurants + ~5N reviews for load checks (N=1000)
+seed-bulk: ## Add N "Test User"s + "Test Restaurant"s, ~5N reviews and ~5N bookings (N=1000, min 10)
 	cd backend && $(HOST_ENV) && go run ./cmd/seed -bulk $(N)
 
 seed-bulk-remove: ## Remove the generated bulk data (and its photos)
@@ -76,6 +76,9 @@ logs: ## Tail infra logs
 
 garage-init: ## One-time Garage layout/key/bucket setup (idempotent)
 	deployment/garage-init.sh
+
+ratings-recompute: ## Rebuild every restaurant's rating totals from its reviews (ADR-0015)
+	$(COMPOSE) exec -T postgres sh -c 'psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c "SELECT recompute_ratings(ARRAY(SELECT id FROM restaurants))"'
 
 psql: ## Open psql in the Postgres container
 	$(COMPOSE) exec postgres sh -c 'psql -U $$POSTGRES_USER -d $$POSTGRES_DB'

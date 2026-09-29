@@ -49,7 +49,7 @@ backend/
       model/ service/ (validate.go = input rules)  repository/ (rules.go = the booking lock)
     reservation/             book / change / cancel, availability, owner table
       routes.go  handler.go  module.go  model/ service/ repository/
-    review/                  ratings and reviews (R-REVIEW-*); repository has RecomputeRatings
+    review/                  ratings and reviews (R-REVIEW-*); totals kept by DB triggers (ADR-0015)
       routes.go  handler.go  module.go  model/ service/ repository/
     admin/                   moderation: users, restaurants, reversible bans, renaming users (R-ADMIN-*)
       routes.go  handler.go  module.go  model/ service/ repository/
@@ -138,7 +138,7 @@ Request and response shapes are in [api.md](api.md).
 | R-SEATS-1 | `booking/peak.go` `LimitedThreshold`, `reservation/service` `Availability` |
 | R-PRIV-1/2 | `reservation/service` `derive`, `review/service` `hideEmail` |
 | R-ADMIN-1 | `auth/middleware.go` `RequireAdmin`, `admin/routes.go` |
-| R-ADMIN-3 | `admin/service` `BanUser`, `auth` login (ErrBanned), `auth/repository` session query, `review/repository` `RecomputeRatings` |
+| R-ADMIN-3 | `admin/service` `BanUser`, `auth` login (ErrBanned), `auth/repository` session query, trigger `accounts_ratings_ban` (`migrations/00005_rating_triggers.sql`) |
 | R-ADMIN-4 | `restaurant/repository` `Visible` (lists, C), `restaurant/service` `Get`, `restaurant/repository/rules.go` `LoadRules(includeHidden)` |
 | R-ADMIN-5 | `admin/service` (guards, unban) |
 | R-ADMIN-6 | `restaurant/service` `lockOwned` (`model.Actor`), `reservation/service` `ListForOwner`, `admin/service` `UpdateUser` |
@@ -178,4 +178,4 @@ Request and response shapes are in [api.md](api.md).
 - Offset paging reads and skips earlier rows, so page 400 costs more than page 1. Keyset ("after id X") paging would fix that, at the price of no "Page N of M".
 - Photos are served straight from Garage, and the API never streams them.
 
-`make seed-bulk N=…` adds generated users, restaurants (one photo each) and about 5N reviews. `make seed-bulk-remove` removes all of it, including the photos.
+`make seed-bulk N=…` (N ≥ 10) adds generated data named so nobody mistakes it for real content: N "Test User N" accounts (`bulkN@example.com`, password `password123`), N "Test Restaurant N · Cuisine" restaurants (one photo each, open 10:00–22:00), about 5N "Test review: …" reviews, and 5N bookings (2 past, 3 upcoming per restaurant, ~10% cancelled). Two rows are heavy so every paged list has several pages: **Test User 1** has ~150 reviews and ~150 bookings, and **Test Restaurant 2** has ~150 reviews and two bookings a day from 60 days ago to 29 days ahead. The bookings follow R-BOOK-1…8 (at most three overlap, each ≤ a quarter of the seats), and nobody reviews their own restaurant. `make seed-bulk-remove` removes all of it, including the photos. (The timings above were measured with the earlier generator, before test names and bookings.)

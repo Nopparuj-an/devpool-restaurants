@@ -12,7 +12,6 @@ import (
 	"restaurants/internal/admin/model"
 	"restaurants/internal/platform/apperr"
 	"restaurants/internal/platform/database"
-	reviewrepo "restaurants/internal/review/repository"
 )
 
 type Repository struct {
@@ -121,18 +120,6 @@ func (r *Repository) SetDisplayName(ctx context.Context, id int64, name string) 
 func (r *Repository) DeleteSessions(ctx context.Context, accountID int64) error {
 	_, err := r.db.Conn(ctx).Exec(ctx, `DELETE FROM sessions WHERE account_id = $1`, accountID)
 	return err
-}
-
-func (r *Repository) ReviewedRestaurants(ctx context.Context, accountID int64) ([]int64, error) {
-	rows, _ := r.db.Conn(ctx).Query(ctx, `SELECT restaurant_id FROM reviews WHERE account_id = $1`, accountID)
-	return pgx.CollectRows(rows, pgx.RowTo[int64])
-}
-
-func (r *Repository) RecomputeRatings(ctx context.Context, restaurantIDs []int64) error {
-	if len(restaurantIDs) == 0 {
-		return nil
-	}
-	return reviewrepo.RecomputeRatings(ctx, r.db.Conn(ctx), restaurantIDs)
 }
 
 const restaurantSelect = `

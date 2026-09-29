@@ -1,6 +1,6 @@
 # 0004 — Stored rating aggregate + Bayesian ranking
 
-**Status:** Accepted (2026-09-26)
+**Status:** Accepted (2026-09-26). Decision 1 (how the totals are kept) superseded by [0015](0015-rating-totals-by-trigger.md).
 
 ## Context
 Two questions from the brief:

@@ -44,24 +44,6 @@ func (r *Repository) Restaurant(ctx context.Context, restaurantID int64) (int64,
 	return owner, hidden, err
 }
 
-// RecomputeRatings rebuilds rating_sum and review_count of the given
-// restaurants from the reviews that count: those by accounts that aren't
-// banned (R-ADMIN-3). Admin bans call it, so unbanning restores the exact totals.
-func RecomputeRatings(ctx context.Context, q database.Querier, restaurantIDs []int64) error {
-	_, err := q.Exec(ctx, `
-		UPDATE restaurants r SET rating_sum = s.sum, review_count = s.n
-		FROM (
-			SELECT r2.id, coalesce(sum(rv.rating), 0) AS sum, count(rv.id) AS n
-			FROM restaurants r2
-			LEFT JOIN (reviews rv JOIN accounts a ON a.id = rv.account_id AND a.banned_at IS NULL)
-				ON rv.restaurant_id = r2.id
-			WHERE r2.id = ANY($1)
-			GROUP BY r2.id
-		) s
-		WHERE s.id = r.id`, restaurantIDs)
-	return err
-}
-
 func (r *Repository) Rating(ctx context.Context, restaurantID, accountID int64) (int, error) {
 	var rating int
 	err := r.db.Conn(ctx).QueryRow(ctx,
@@ -86,20 +68,12 @@ func (r *Repository) Update(ctx context.Context, restaurantID, accountID int64, 
 	return err
 }
 
-func (r *Repository) Delete(ctx context.Context, restaurantID, accountID int64) (int, error) {
-	var old int
-	err := r.db.Conn(ctx).QueryRow(ctx,
-		`DELETE FROM reviews WHERE restaurant_id = $1 AND account_id = $2 RETURNING rating`, restaurantID, accountID).Scan(&old)
-	if database.IsNoRows(err) {
-		return 0, apperr.ErrNotFound
+func (r *Repository) Delete(ctx context.Context, restaurantID, accountID int64) error {
+	tag, err := r.db.Conn(ctx).Exec(ctx,
+		`DELETE FROM reviews WHERE restaurant_id = $1 AND account_id = $2`, restaurantID, accountID)
+	if err == nil && tag.RowsAffected() == 0 {
+		return apperr.ErrNotFound
 	}
-	return old, err
-}
-
-func (r *Repository) AdjustAggregate(ctx context.Context, restaurantID int64, sumDelta, countDelta int) error {
-	_, err := r.db.Conn(ctx).Exec(ctx, `
-		UPDATE restaurants SET rating_sum = rating_sum + $2, review_count = review_count + $3
-		WHERE id = $1`, restaurantID, sumDelta, countDelta)
 	return err
 }
 

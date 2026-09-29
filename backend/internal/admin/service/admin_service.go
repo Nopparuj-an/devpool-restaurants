@@ -23,10 +23,6 @@ type Repository interface {
 	SetUserBan(ctx context.Context, id int64, at *time.Time, reason string) error
 	SetDisplayName(ctx context.Context, id int64, name string) error // apperr.ErrNotFound if missing
 	DeleteSessions(ctx context.Context, accountID int64) error
-	// ReviewedRestaurants lists restaurants the account has reviewed.
-	ReviewedRestaurants(ctx context.Context, accountID int64) ([]int64, error)
-	// RecomputeRatings rebuilds the rating totals from reviews that count.
-	RecomputeRatings(ctx context.Context, restaurantIDs []int64) error
 	SetRestaurantBan(ctx context.Context, id int64, at *time.Time, reason string) error // ErrNotFound if missing
 }
 
@@ -104,7 +100,7 @@ func (s *service) UpdateUser(ctx context.Context, id int64, in model.UserInput) 
 
 // BanUser suspends an account (R-ADMIN-3): it can't log in, its sessions end
 // now, its restaurants and reviews are hidden, and the ratings it affected
-// are recomputed without its reviews.
+// are recomputed without its reviews (by a database trigger, ADR-0015).
 func (s *service) BanUser(ctx context.Context, admin, id int64, reason string) (model.User, error) {
 	reason, err := checkReason(reason)
 	if err != nil {
@@ -132,8 +128,8 @@ func (s *service) UnbanUser(ctx context.Context, admin, id int64) (model.User, e
 	})
 }
 
-// setUserBan locks the account, applies change, and recomputes the ratings
-// of everything the user reviewed, all in one transaction. change receives
+// setUserBan locks the account and applies change in one transaction; the
+// ban trigger recomputes the ratings the user's reviews count in. change receives
 // the transaction's ctx and must use it (not an outer ctx), or its writes run
 // outside the transaction and wait forever on the row lock.
 func (s *service) setUserBan(ctx context.Context, id int64, change func(ctx context.Context, u model.User) error) (model.User, error) {
@@ -142,14 +138,7 @@ func (s *service) setUserBan(ctx context.Context, id int64, change func(ctx cont
 		if err != nil {
 			return err
 		}
-		if err := change(ctx, u); err != nil {
-			return err
-		}
-		reviewed, err := s.repo.ReviewedRestaurants(ctx, id)
-		if err != nil {
-			return err
-		}
-		return s.repo.RecomputeRatings(ctx, reviewed)
+		return change(ctx, u)
 	})
 	if err != nil {
 		return model.User{}, err

@@ -1,6 +1,6 @@
 // Package service holds the review rules: one review per account and
-// restaurant, no reviewing your own place, and keeping the restaurant's
-// rating totals in step in the same transaction (ADR-0004).
+// restaurant, and no reviewing your own place. The restaurant's rating totals
+// are kept by database triggers on every review change (ADR-0015).
 package service
 
 import (
@@ -16,16 +16,15 @@ import (
 
 // Repository is the outbound port for review data.
 type Repository interface {
-	// LockRestaurant locks the restaurant row (serializing its rating
-	// updates) and returns its owner; apperr.ErrNotFound if missing or hidden.
+	// LockRestaurant locks the restaurant row (serializing reviews of it) and
+	// returns its owner; apperr.ErrNotFound if missing or hidden.
 	LockRestaurant(ctx context.Context, restaurantID int64) (int64, error)
 	// Restaurant returns the owner and whether customers can't see it (R-ADMIN-3, -4).
 	Restaurant(ctx context.Context, restaurantID int64) (owner int64, hidden bool, err error)
 	Rating(ctx context.Context, restaurantID, accountID int64) (int, error) // apperr.ErrNotFound if none
 	Insert(ctx context.Context, restaurantID, accountID int64, rating int, body string) error
 	Update(ctx context.Context, restaurantID, accountID int64, rating int, body string) error
-	Delete(ctx context.Context, restaurantID, accountID int64) (int, error) // returns the old rating
-	AdjustAggregate(ctx context.Context, restaurantID int64, sumDelta, countDelta int) error
+	Delete(ctx context.Context, restaurantID, accountID int64) error // apperr.ErrNotFound if none
 	List(ctx context.Context, restaurantID int64, now time.Time, limit, offset int) ([]model.Review, int, error)
 	Mine(ctx context.Context, restaurantID, accountID int64, now time.Time) (model.Review, error) // ErrNotFound if none
 }
@@ -73,36 +72,26 @@ func (s *service) Upsert(ctx context.Context, me, restaurantID int64, in model.I
 		if owner == me {
 			return model.ErrOwnReview
 		}
-		old, err := s.repo.Rating(ctx, restaurantID, me)
+		_, err = s.repo.Rating(ctx, restaurantID, me)
 		switch {
 		case errors.Is(err, apperr.ErrNotFound):
 			created = true
-			if err := s.repo.Insert(ctx, restaurantID, me, in.Rating, body); err != nil {
-				return err
-			}
-			return s.repo.AdjustAggregate(ctx, restaurantID, in.Rating, 1)
+			return s.repo.Insert(ctx, restaurantID, me, in.Rating, body)
 		case err != nil:
 			return err
 		}
-		if err := s.repo.Update(ctx, restaurantID, me, in.Rating, body); err != nil {
-			return err
-		}
-		return s.repo.AdjustAggregate(ctx, restaurantID, in.Rating-old, 0)
+		return s.repo.Update(ctx, restaurantID, me, in.Rating, body)
 	})
 	return created, err
 }
 
-// Delete removes my review (R-REVIEW-7) and takes it out of the totals.
+// Delete removes my review (R-REVIEW-7); the trigger takes it out of the totals.
 func (s *service) Delete(ctx context.Context, me, restaurantID int64) error {
 	return s.tx.WithinTx(ctx, func(ctx context.Context) error {
 		if _, err := s.repo.LockRestaurant(ctx, restaurantID); err != nil {
 			return err
 		}
-		old, err := s.repo.Delete(ctx, restaurantID, me)
-		if err != nil {
-			return err
-		}
-		return s.repo.AdjustAggregate(ctx, restaurantID, -old, -1)
+		return s.repo.Delete(ctx, restaurantID, me)
 	})
 }
 

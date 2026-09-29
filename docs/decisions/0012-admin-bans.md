@@ -1,6 +1,6 @@
 # 0012 — Admins and reversible bans
 
-**Status:** Accepted (2026-09-26)
+**Status:** Accepted (2026-09-26). Rebuilding ratings on ban is now done by a database trigger, see [0015](0015-rating-totals-by-trigger.md).
 
 ## Context
 Admins need to moderate users and restaurants. Admin rights come from the database only. Bans must hide content and remove it from ratings, and must be undoable.
