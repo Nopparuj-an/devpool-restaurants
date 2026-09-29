@@ -13,7 +13,18 @@ http:
     - name: offset
       value: "0"
       type: query
+    - name: sort
+      value: newest
+      type: query
+    - name: rating
+      value: "5"
+      type: query
   auth: inherit
+
+docs:
+  content: |-
+    `sort`: newest (default) or oldest, by last update. `rating` 1 to 5 shows that star rating only; leave it out for all. `total` counts the matches; `rating_counts` has every star level (R-REVIEW-8).
+  type: text/markdown
 
 settings:
   encodeUrl: true

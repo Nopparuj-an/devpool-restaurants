@@ -1,0 +1,26 @@
+info:
+  name: "/admin/restaurants/delete"
+  type: http
+  seq: 15
+
+http:
+  method: POST
+  url: "{{base_url}}/admin/restaurants/delete"
+  body:
+    type: json
+    data: |-
+      {
+        "ids": [999999999]
+      }
+  auth: inherit
+
+docs:
+  content: |-
+    Admins only: run **auth / login (admin)** first. Deletes up to 500 restaurants with their bookings, reviews and photos (R-ADMIN-6, R-REST-5). Missing ids are skipped; the answer is {deleted: n}. The id here doesn't exist, so the run leaves seed data alone.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

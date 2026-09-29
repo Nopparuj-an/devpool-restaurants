@@ -62,14 +62,25 @@ type UserInput struct {
 	DisplayName string `json:"display_name"`
 }
 
+// DeleteInput names the users or restaurants to delete in one request.
+type DeleteInput struct {
+	IDs []int64 `json:"ids"`
+}
+
+// MaxDelete caps one bulk delete; the admin pages send bigger selections in chunks.
+const MaxDelete = 500
+
 type BanInput struct {
 	Reason string `json:"reason"` // optional, shown to the owner and other admins
 }
 
 var (
-	ErrBanSelf   = apperr.New(apperr.Conflict, "R-ADMIN-5", "you can't ban yourself")
-	ErrBanAdmin  = apperr.New(apperr.Conflict, "R-ADMIN-5", "admins can't be banned; remove their admin rights in the database first")
-	ErrBadStatus = apperr.InvalidInput("status must be active or banned")
-	ErrReason    = apperr.InvalidInput("reason must be at most 500 characters")
-	ErrName      = apperr.InvalidInput("display name must be 1 to 80 characters")
+	ErrBanSelf     = apperr.New(apperr.Conflict, "R-ADMIN-5", "you can't ban yourself")
+	ErrBanAdmin    = apperr.New(apperr.Conflict, "R-ADMIN-5", "admins can't be banned; remove their admin rights in the database first")
+	ErrDeleteSelf  = apperr.New(apperr.Conflict, "R-ADMIN-8", "you can't delete your own account")
+	ErrDeleteAdmin = apperr.New(apperr.Conflict, "R-ADMIN-8", "admins can't be deleted; remove their admin rights in the database first")
+	ErrDeleteIDs   = apperr.InvalidInput("ids must list 1 to 500 ids")
+	ErrBadStatus   = apperr.InvalidInput("status must be active or banned")
+	ErrReason      = apperr.InvalidInput("reason must be at most 500 characters")
+	ErrName        = apperr.InvalidInput("display name must be 1 to 80 characters")
 )

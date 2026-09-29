@@ -176,3 +176,53 @@ func TestTopRatedIsBayesian(t *testing.T) {
 		t.Errorf("most_reviewed = %s", got)
 	}
 }
+
+// R-REVIEW-8: the list reports how many reviews have each star rating, can
+// show one rating only, and sorts newest or oldest first.
+func TestReviewFilterSortAndCounts(t *testing.T) {
+	env := apitest.New(t)
+	owner := env.Signup("owner@example.com", "Owner")
+	id := owner.CreateRestaurant(apitest.RestaurantInput("Rated", 10))
+	stars := []int{5, 4, 5, 1, 5}
+	for i, r := range stars {
+		env.Signup(fmt.Sprintf("r%d@example.com", i), fmt.Sprintf("R%d", i)).
+			Do("PUT", fmt.Sprintf("/api/restaurants/%d/reviews/me", id), review(r, fmt.Sprintf("review %d", i))).Expect(http.StatusCreated)
+	}
+	type page struct {
+		Reviews []struct {
+			Rating int
+			Body   string
+		}
+		Total        int
+		RatingCounts map[string]int `json:"rating_counts"`
+	}
+	get := func(q string) page {
+		t.Helper()
+		var p page
+		owner.Do("GET", fmt.Sprintf("/api/restaurants/%d/reviews?%s", id, q), nil).Expect(http.StatusOK).JSON(&p)
+		return p
+	}
+
+	all := get("")
+	if all.Total != 5 || fmt.Sprint(all.RatingCounts) != "map[1:1 2:0 3:0 4:1 5:3]" {
+		t.Fatalf("all: total %d, counts %v", all.Total, all.RatingCounts)
+	}
+	if all.Reviews[0].Body != "review 4" {
+		t.Errorf("newest first: got %q", all.Reviews[0].Body)
+	}
+
+	fives := get("rating=5&sort=oldest&limit=2")
+	if fives.Total != 3 || len(fives.Reviews) != 2 || fives.Reviews[0].Body != "review 0" || fives.Reviews[1].Body != "review 2" {
+		t.Fatalf("5 stars oldest first: %+v", fives)
+	}
+	if fmt.Sprint(fives.RatingCounts) != fmt.Sprint(all.RatingCounts) {
+		t.Errorf("counts shouldn't depend on the filter: %v", fives.RatingCounts)
+	}
+	if none := get("rating=3"); none.Total != 0 || len(none.Reviews) != 0 {
+		t.Errorf("3 stars: %+v", none)
+	}
+
+	for _, q := range []string{"rating=6", "rating=0", "rating=x", "sort=best"} {
+		owner.Do("GET", fmt.Sprintf("/api/restaurants/%d/reviews?%s", id, q), nil).ExpectError(http.StatusUnprocessableEntity, "invalid_input")
+	}
+}

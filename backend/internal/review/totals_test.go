@@ -92,6 +92,7 @@ func TestTotalsRepairAndGuard(t *testing.T) {
 		`UPDATE restaurants SET rating_sum = -1 WHERE id = $1`,
 		`UPDATE restaurants SET review_count = -1, rating_sum = 0 WHERE id = $1`,
 		`UPDATE restaurants SET rating_sum = 6 WHERE id = $1`, // 1 review can't sum to 6
+		`UPDATE restaurants SET rating_counts = '{1,0,0,0,0}' WHERE id = $1`, // counts must match the 5★ total
 	} {
 		if _, err := env.DB.Exec(context.Background(), sql, id); err == nil {
 			t.Errorf("%s: want check violation", sql)
@@ -99,13 +100,13 @@ func TestTotalsRepairAndGuard(t *testing.T) {
 	}
 
 	// Plausible but wrong totals heal on the next review change...
-	exec(t, env.DB, `UPDATE restaurants SET rating_sum = 0, review_count = 0 WHERE id = $1`, id)
+	exec(t, env.DB, `UPDATE restaurants SET rating_sum = 0, review_count = 0, rating_counts = '{0,0,0,0,0}' WHERE id = $1`, id)
 	env.Signup("bob@example.com", "Bob").Do("PUT", path, review(3, "ok")).Expect(http.StatusCreated)
 	if got := dbTotals(t, env.DB, id); got != (totals{8, 2}) {
 		t.Fatalf("after next review: %+v", got)
 	}
 	// ...or at once with `make ratings-recompute`.
-	exec(t, env.DB, `UPDATE restaurants SET rating_sum = 0, review_count = 0 WHERE id = $1`, id)
+	exec(t, env.DB, `UPDATE restaurants SET rating_sum = 0, review_count = 0, rating_counts = '{0,0,0,0,0}' WHERE id = $1`, id)
 	exec(t, env.DB, `SELECT recompute_ratings(ARRAY(SELECT id FROM restaurants))`)
 	if got := dbTotals(t, env.DB, id); got != (totals{8, 2}) {
 		t.Fatalf("after recompute: %+v", got)

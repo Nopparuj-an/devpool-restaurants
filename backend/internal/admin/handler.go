@@ -1,6 +1,6 @@
 // Package admin is moderation for admins (R-ADMIN-*): list users and
-// restaurants, see what a user owns, edit a user's profile, and ban or unban
-// either. Admins edit restaurants through the restaurant routes (R-ADMIN-6);
+// restaurants, see what a user owns, edit a user's profile, ban or unban
+// either, and delete them in bulk. Admins edit restaurants through the restaurant routes (R-ADMIN-6);
 // impersonation is in the auth module, since it swaps the session cookie. Admin rights
 // are granted in the database only (`make admin EMAIL=…`).
 //
@@ -114,6 +114,33 @@ func (h *Handler) UnbanUser(c *gin.Context) error {
 		return err
 	}
 	c.JSON(http.StatusOK, u)
+	return nil
+}
+
+// DeleteUsers takes {"ids": [...]} and answers {"deleted": n}.
+func (h *Handler) DeleteUsers(c *gin.Context) error {
+	var in model.DeleteInput
+	if err := web.Decode(c, &in); err != nil {
+		return err
+	}
+	n, err := h.svc.DeleteUsers(c.Request.Context(), auth.MustAccount(c).ID, in.IDs)
+	if err != nil {
+		return err
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": n})
+	return nil
+}
+
+func (h *Handler) DeleteRestaurants(c *gin.Context) error {
+	var in model.DeleteInput
+	if err := web.Decode(c, &in); err != nil {
+		return err
+	}
+	n, err := h.svc.DeleteRestaurants(c.Request.Context(), in.IDs)
+	if err != nil {
+		return err
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": n})
 	return nil
 }
 

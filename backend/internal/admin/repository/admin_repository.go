@@ -122,6 +122,45 @@ func (r *Repository) DeleteSessions(ctx context.Context, accountID int64) error 
 	return err
 }
 
+func (r *Repository) LockUsers(ctx context.Context, ids []int64) ([]model.User, error) {
+	rows, _ := r.db.Conn(ctx).Query(ctx,
+		`SELECT id, is_admin FROM accounts WHERE id = ANY($1) ORDER BY id FOR UPDATE`, ids)
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (model.User, error) {
+		var u model.User
+		err := row.Scan(&u.ID, &u.IsAdmin)
+		return u, err
+	})
+}
+
+func (r *Repository) DeleteUsers(ctx context.Context, ids []int64) (int, []string, error) {
+	return r.deleteWithImages(ctx, "owner_id", `DELETE FROM accounts WHERE id = ANY($1)`, ids)
+}
+
+func (r *Repository) DeleteRestaurants(ctx context.Context, ids []int64) (int, []string, error) {
+	return r.deleteWithImages(ctx, "id", `DELETE FROM restaurants WHERE id = ANY($1)`, ids)
+}
+
+// deleteWithImages locks the restaurants that will go (so no photo is added
+// meanwhile), reads their photo keys, then runs del. Must run in a transaction.
+func (r *Repository) deleteWithImages(ctx context.Context, col, del string, ids []int64) (int, []string, error) {
+	q := r.db.Conn(ctx)
+	if _, err := q.Exec(ctx, `SELECT 1 FROM restaurants WHERE `+col+` = ANY($1) ORDER BY id FOR UPDATE`, ids); err != nil {
+		return 0, nil, err
+	}
+	rows, _ := q.Query(ctx, `
+		SELECT i.object_key FROM restaurant_images i JOIN restaurants r ON r.id = i.restaurant_id
+		WHERE r.`+col+` = ANY($1)`, ids)
+	keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return 0, nil, err
+	}
+	tag, err := q.Exec(ctx, del, ids)
+	if err != nil {
+		return 0, nil, err
+	}
+	return int(tag.RowsAffected()), keys, nil
+}
+
 const restaurantSelect = `
 	SELECT r.id, r.name, r.cuisine, r.location,
 		CASE WHEN r.review_count > 0 THEN round(r.rating_sum::numeric / r.review_count, 1)::float8 END,

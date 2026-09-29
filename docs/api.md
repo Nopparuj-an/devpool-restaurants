@@ -56,7 +56,7 @@ Image URLs are relative (`/images/restaurants/…`). Next.js rewrites `/images/*
 Timestamps in query strings must be URL-encoded (`+07:00` → `%2B07:00`), or just send UTC `Z` times.
 
 ## Admin
-Admin session required (R-ADMIN-1): 401 when logged out, 403 `admin_only` for other accounts. List queries take `?q=&status=active|banned&limit=&offset=` (limit ≤ 100, default 50).
+Admin session required (R-ADMIN-1): 401 when logged out, 403 `admin_only` for other accounts. List queries take `?q=&status=active|banned&limit=&offset=` (limit ≤ 500, default 50).
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
@@ -65,10 +65,12 @@ Admin session required (R-ADMIN-1): 401 when logged out, 403 `admin_only` for ot
 | POST | `/admin/users/{id}/ban` | `{reason?}` | AdminUser. `409 R-ADMIN-5` for yourself or an admin |
 | POST | `/admin/users/{id}/unban` | – | AdminUser |
 | PUT | `/admin/users/{id}` | `{display_name}` | AdminUser (R-ADMIN-6) |
+| POST | `/admin/users/delete` | `{ids: [1–500 ids]}` | `{deleted: n}` (R-ADMIN-8). Hard delete; their restaurants, bookings and reviews cascade, photos are removed. Missing ids are skipped. All or nothing: `409 R-ADMIN-8` if any id is yourself or an admin. `422` for 0 or more than 500 ids |
 | POST | `/admin/users/{id}/impersonate` | – | `204` + a session cookie as the user (R-ADMIN-7). `409 R-ADMIN-7` for yourself, an admin or a banned user |
 | GET | `/admin/restaurants` | – | `{restaurants: AdminRestaurant[], total}`. `q` matches name, cuisine or owner email. Includes hidden ones |
 | POST | `/admin/restaurants/{id}/ban` | `{reason?}` | `204` |
 | POST | `/admin/restaurants/{id}/unban` | – | `204` |
+| POST | `/admin/restaurants/delete` | `{ids: [1–500 ids]}` | `{deleted: n}` (R-ADMIN-6, R-REST-5): bookings, reviews and photos go too. Missing ids are skipped |
 
 **AdminUser:** `{id, email, display_name, is_admin, banned_at, ban_reason, created_at, restaurants, reviews, reservations}` (the last three are counts).
 **AdminRestaurant:** `{id, name, cuisine, location, rating, review_count, banned_at, ban_reason, created_at, owner: {id, display_name, email, banned}}`.
@@ -88,7 +90,7 @@ A profile's restaurants: `GET /restaurants?owner_id={id}`.
 ## Reviews
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| GET | `/restaurants/{id}/reviews` | `?limit=&offset=` (limit ≤ 100, default 20) | `{reviews, total}`, most recently updated first |
+| GET | `/restaurants/{id}/reviews` | `?limit=&offset=&rating=&sort=` (limit ≤ 100, default 20; `rating` 1–5 filters to that star rating; `sort` newest (default) or oldest, by last update) | `{reviews, total, rating_counts}` (R-REVIEW-8). `total` counts the matches; `rating_counts` is `{"1": n, …, "5": n}` whatever the filter. `422` for another rating or sort |
 | GET 🔒 | `/restaurants/{id}/reviews/me` | – | My Review, or `404` |
 | PUT 🔒 | `/restaurants/{id}/reviews/me` | `{rating 1-5, body}` | `201` when created, `200` when updated (one per account, R-REVIEW-2). `403 R-REVIEW-3` on your own restaurant |
 | DELETE 🔒 | `/restaurants/{id}/reviews/me` | – | `204` |

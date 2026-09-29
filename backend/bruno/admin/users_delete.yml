@@ -1,0 +1,26 @@
+info:
+  name: "/admin/users/delete"
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: "{{base_url}}/admin/users/delete"
+  body:
+    type: json
+    data: |-
+      {
+        "ids": [999999999]
+      }
+  auth: inherit
+
+docs:
+  content: |-
+    Admins only: run **auth / login (admin)** first. Deletes up to 500 accounts and everything that cascades: their restaurants (with bookings, reviews, photos), bookings and reviews (R-ADMIN-8). Missing ids are skipped; the answer is {deleted: n}. All or nothing: 409 R-ADMIN-8 if any id is yourself or an admin. The id here doesn't exist, so the run leaves seed data alone.
+  type: text/markdown
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

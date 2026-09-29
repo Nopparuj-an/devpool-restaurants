@@ -4,7 +4,7 @@
 //	handler.go       endpoints
 //	module.go        wiring
 //	model/           Review, Input, errors
-//	service/         one-review rule, totals in the same transaction + Repository port
+//	service/         one-review rule, list filters + Repository port (totals: DB triggers, ADR-0015)
 //	repository/      SQL
 package review
 
@@ -31,14 +31,22 @@ func (h *Handler) List(c *gin.Context) error {
 	if err != nil {
 		return err
 	}
-	limit, _ := strconv.Atoi(c.Query("limit"))
-	offset, _ := strconv.Atoi(c.Query("offset"))
+	q := model.ListQuery{Sort: c.Query("sort")}
+	q.Limit, _ = strconv.Atoi(c.Query("limit"))
+	q.Offset, _ = strconv.Atoi(c.Query("offset"))
+	if v := c.Query("rating"); v != "" {
+		if n, err := strconv.Atoi(v); err != nil || n == 0 {
+			q.Rating = -1 // rejected by the service
+		} else {
+			q.Rating = n
+		}
+	}
 	viewer, admin := auth.Viewer(c)
-	list, total, err := h.svc.List(c.Request.Context(), viewer, admin, id, limit, offset)
+	page, err := h.svc.List(c.Request.Context(), viewer, admin, id, q)
 	if err != nil {
 		return err
 	}
-	c.JSON(http.StatusOK, gin.H{"reviews": list, "total": total})
+	c.JSON(http.StatusOK, page)
 	return nil
 }
 

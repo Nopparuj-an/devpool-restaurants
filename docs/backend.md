@@ -142,6 +142,8 @@ Request and response shapes are in [api.md](api.md).
 | R-ADMIN-4 | `restaurant/repository` `Visible` (lists, C), `restaurant/service` `Get`, `restaurant/repository/rules.go` `LoadRules(includeHidden)` |
 | R-ADMIN-5 | `admin/service` (guards, unban) |
 | R-ADMIN-6 | `restaurant/service` `lockOwned` (`model.Actor`), `reservation/service` `ListForOwner`, `admin/service` `UpdateUser` |
+| R-ADMIN-8 | `admin/service` `DeleteUsers` (guards, all or nothing), `DeleteRestaurants`; `admin/repository` `deleteWithImages`; photos removed after commit |
+| R-REVIEW-8 | `review/repository` `List` (filter, sort, `rating_counts`); counts kept by `recompute_ratings` (`migrations/00006_rating_counts.sql`) |
 | R-ADMIN-7 | `auth/service` `Impersonate`, `StopImpersonating`; `auth/repository` `AccountBySession` (drops the session when the admin loses rights); `auth/handler.go` `SetPassword` guard |
 | R-PROFILE-* | `profile/service` (who sees what), `profile/repository` (`visibleReview`) |
 | R-TIME-* | `cmd/api/main.go` (UTC), `platform/database` (session timezone) |
@@ -156,7 +158,7 @@ Request and response shapes are in [api.md](api.md).
 
 ## Scaling
 
-**Every list is paged or bounded.** Restaurants, reviews and my bookings take `limit`/`offset` and return `total`. The restaurant list computes its total in the same query with `count(*) OVER ()`. Availability is capped at 7 days (672 slots), the owner table at 31 days. Search (`q`, name or cuisine) runs in SQL. The web app pages the home list 24 at a time and loads reviews and past bookings with "Show more".
+**Every list is paged or bounded.** Restaurants, reviews and my bookings take `limit`/`offset` and return `total`. The restaurant list computes its total in the same query with `count(*) OVER ()`. Availability is capped at 7 days (672 slots), the owner table at 31 days. Search (`q`, name or cuisine) runs in SQL. The web app grows the home list 24 at a time as you scroll, and reviews and past bookings the same way; admin lists page 25 to 500 at a time. A review filter reads its total from `rating_counts`, so it costs no count query.
 
 **Indexes** (`migrations/00002_scaling_indexes.sql`): pg_trgm GIN indexes make `ILIKE '%…%'` search use an index. There are b-tree indexes for "Most reviewed", "New", and each restaurant's reviews. The booking overlap query uses `reservations_active_time_idx` from the first migration.
 

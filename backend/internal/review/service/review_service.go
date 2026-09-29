@@ -25,7 +25,7 @@ type Repository interface {
 	Insert(ctx context.Context, restaurantID, accountID int64, rating int, body string) error
 	Update(ctx context.Context, restaurantID, accountID int64, rating int, body string) error
 	Delete(ctx context.Context, restaurantID, accountID int64) error // apperr.ErrNotFound if none
-	List(ctx context.Context, restaurantID int64, now time.Time, limit, offset int) ([]model.Review, int, error)
+	List(ctx context.Context, restaurantID int64, now time.Time, q model.ListQuery) (model.Page, error)
 	Mine(ctx context.Context, restaurantID, accountID int64, now time.Time) (model.Review, error) // ErrNotFound if none
 }
 
@@ -38,10 +38,11 @@ type Service interface {
 	// Upsert creates or replaces my review (R-REVIEW-2) and reports whether it was created.
 	Upsert(ctx context.Context, me, restaurantID int64, in model.Input) (bool, error)
 	Delete(ctx context.Context, me, restaurantID int64) error
-	// List returns one page of reviews (most recently updated first) and the
-	// total; viewer is the logged-in account or 0. Hidden restaurants' reviews
-	// are only shown to the owner and admins.
-	List(ctx context.Context, viewer int64, admin bool, restaurantID int64, limit, offset int) ([]model.Review, int, error)
+	// List returns one page of reviews, optionally one star rating only,
+	// newest or oldest first, with the per-star counts (R-REVIEW-8); viewer
+	// is the logged-in account or 0. Hidden restaurants' reviews are only
+	// shown to the owner and admins.
+	List(ctx context.Context, viewer int64, admin bool, restaurantID int64, q model.ListQuery) (model.Page, error)
 	Mine(ctx context.Context, me, restaurantID int64) (model.Review, error)
 }
 
@@ -95,22 +96,33 @@ func (s *service) Delete(ctx context.Context, me, restaurantID int64) error {
 	})
 }
 
-func (s *service) List(ctx context.Context, viewer int64, admin bool, restaurantID int64, limit, offset int) ([]model.Review, int, error) {
+func (s *service) List(ctx context.Context, viewer int64, admin bool, restaurantID int64, q model.ListQuery) (model.Page, error) {
+	switch q.Sort {
+	case "":
+		q.Sort = "newest"
+	case "newest", "oldest":
+	default:
+		return model.Page{}, model.ErrSort
+	}
+	if q.Rating < 0 || q.Rating > 5 {
+		return model.Page{}, model.ErrFilter
+	}
 	owner, hidden, err := s.repo.Restaurant(ctx, restaurantID)
 	if err != nil {
-		return nil, 0, err
+		return model.Page{}, err
 	}
 	if hidden && viewer != owner && !admin {
-		return nil, 0, apperr.ErrNotFound
+		return model.Page{}, apperr.ErrNotFound
 	}
-	if limit <= 0 || limit > 100 {
-		limit = 20
+	if q.Limit <= 0 || q.Limit > 100 {
+		q.Limit = 20
 	}
-	list, total, err := s.repo.List(ctx, restaurantID, s.now(), limit, max(offset, 0))
-	for i := range list {
-		hideEmail(&list[i], viewer)
+	q.Offset = max(q.Offset, 0)
+	page, err := s.repo.List(ctx, restaurantID, s.now(), q)
+	for i := range page.Reviews {
+		hideEmail(&page.Reviews[i], viewer)
 	}
-	return list, total, err
+	return page, err
 }
 
 func (s *service) Mine(ctx context.Context, me, restaurantID int64) (model.Review, error) {

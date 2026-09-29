@@ -103,17 +103,34 @@ func (r *Repository) collect(ctx context.Context, sql string, args ...any) ([]mo
 	})
 }
 
-func (r *Repository) List(ctx context.Context, restaurantID int64, now time.Time, limit, offset int) ([]model.Review, int, error) {
-	q := r.db.Conn(ctx)
-	var total int
-	if err := q.QueryRow(ctx, `SELECT review_count FROM restaurants WHERE id = $1`, restaurantID).Scan(&total); err != nil {
-		return nil, 0, err
+// List reads the totals the triggers keep (ADR-0015), so the count per star
+// and the filtered total cost no aggregation.
+func (r *Repository) List(ctx context.Context, restaurantID int64, now time.Time, q model.ListQuery) (model.Page, error) {
+	var (
+		total  int
+		counts []int
+	)
+	if err := r.db.Conn(ctx).QueryRow(ctx, `SELECT review_count, rating_counts FROM restaurants WHERE id = $1`,
+		restaurantID).Scan(&total, &counts); err != nil {
+		return model.Page{}, err
 	}
-	list, err := r.collect(ctx, listSelect+`
-		WHERE rv.restaurant_id = $1
-		ORDER BY rv.updated_at DESC, rv.id DESC
-		LIMIT $3 OFFSET $4`, restaurantID, now, limit, offset)
-	return list, total, err
+	page := model.Page{Total: total, RatingCounts: map[int]int{}}
+	for i, n := range counts {
+		page.RatingCounts[i+1] = n
+	}
+	where, order := ` WHERE rv.restaurant_id = $1`, `rv.updated_at DESC, rv.id DESC`
+	args := []any{restaurantID, now, q.Limit, q.Offset}
+	if q.Rating > 0 {
+		where += ` AND rv.rating = $5`
+		args = append(args, q.Rating)
+		page.Total = page.RatingCounts[q.Rating]
+	}
+	if q.Sort == "oldest" {
+		order = `rv.updated_at, rv.id`
+	}
+	var err error
+	page.Reviews, err = r.collect(ctx, listSelect+where+` ORDER BY `+order+` LIMIT $3 OFFSET $4`, args...)
+	return page, err
 }
 
 func (r *Repository) Mine(ctx context.Context, restaurantID, accountID int64, now time.Time) (model.Review, error) {

@@ -1,9 +1,12 @@
-// Package service holds the admin rules: who can be banned, and what a ban
-// does (R-ADMIN-*). Bans are reversible: they set banned_at, never delete.
+// Package service holds the admin rules: who can be banned or deleted, and
+// what that does (R-ADMIN-*). Bans are reversible: they set banned_at. Deletes
+// are not: rows cascade, and photos go from storage after commit.
 package service
 
 import (
 	"context"
+	"log/slog"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -24,6 +27,19 @@ type Repository interface {
 	SetDisplayName(ctx context.Context, id int64, name string) error // apperr.ErrNotFound if missing
 	DeleteSessions(ctx context.Context, accountID int64) error
 	SetRestaurantBan(ctx context.Context, id int64, at *time.Time, reason string) error // ErrNotFound if missing
+
+	// LockUsers locks the listed accounts that exist and returns them.
+	LockUsers(ctx context.Context, ids []int64) ([]model.User, error)
+	// DeleteUsers deletes accounts and everything that cascades from them,
+	// and returns how many went and the photo keys of their restaurants.
+	DeleteUsers(ctx context.Context, ids []int64) (n int, imageKeys []string, err error)
+	// DeleteRestaurants is DeleteUsers for restaurants (R-REST-5).
+	DeleteRestaurants(ctx context.Context, ids []int64) (n int, imageKeys []string, err error)
+}
+
+// Images is the outbound port for photo storage.
+type Images interface {
+	Delete(ctx context.Context, keys ...string) error
 }
 
 type TxRunner interface {
@@ -42,16 +58,22 @@ type Service interface {
 	ListRestaurants(ctx context.Context, q model.ListQuery) ([]model.Restaurant, int, error)
 	BanRestaurant(ctx context.Context, id int64, reason string) error
 	UnbanRestaurant(ctx context.Context, id int64) error
+	// DeleteUsers and DeleteRestaurants delete up to MaxDelete rows at once
+	// (R-ADMIN-8, R-ADMIN-6) and return how many existed. Missing IDs are
+	// skipped, so a retry is harmless.
+	DeleteUsers(ctx context.Context, admin int64, ids []int64) (int, error)
+	DeleteRestaurants(ctx context.Context, ids []int64) (int, error)
 }
 
 type service struct {
-	repo Repository
-	tx   TxRunner
-	now  func() time.Time
+	repo   Repository
+	tx     TxRunner
+	images Images
+	now    func() time.Time
 }
 
-func New(repo Repository, tx TxRunner) Service {
-	return &service{repo: repo, tx: tx, now: time.Now}
+func New(repo Repository, tx TxRunner, images Images) Service {
+	return &service{repo: repo, tx: tx, images: images, now: time.Now}
 }
 
 func normalize(q model.ListQuery) (model.ListQuery, error) {
@@ -62,7 +84,7 @@ func normalize(q model.ListQuery) (model.ListQuery, error) {
 	default:
 		return q, model.ErrBadStatus
 	}
-	if q.Limit <= 0 || q.Limit > 100 {
+	if q.Limit <= 0 || q.Limit > model.MaxDelete {
 		q.Limit = 50
 	}
 	q.Offset = max(q.Offset, 0)
@@ -167,6 +189,84 @@ func (s *service) BanRestaurant(ctx context.Context, id int64, reason string) er
 
 func (s *service) UnbanRestaurant(ctx context.Context, id int64) error {
 	return s.repo.SetRestaurantBan(ctx, id, nil, "")
+}
+
+// DeleteUsers is all or nothing: if any listed account is the acting admin
+// or another admin, nothing is deleted (R-ADMIN-8).
+func (s *service) DeleteUsers(ctx context.Context, admin int64, ids []int64) (int, error) {
+	ids, err := checkIDs(ids)
+	if err != nil {
+		return 0, err
+	}
+	var (
+		n    int
+		keys []string
+	)
+	err = s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		users, err := s.repo.LockUsers(ctx, ids)
+		if err != nil {
+			return err
+		}
+		for _, u := range users {
+			switch {
+			case u.ID == admin:
+				return model.ErrDeleteSelf
+			case u.IsAdmin:
+				return model.ErrDeleteAdmin
+			}
+		}
+		n, keys, err = s.repo.DeleteUsers(ctx, ids)
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	s.deleteImages(keys)
+	return n, nil
+}
+
+func (s *service) DeleteRestaurants(ctx context.Context, ids []int64) (int, error) {
+	ids, err := checkIDs(ids)
+	if err != nil {
+		return 0, err
+	}
+	var (
+		n    int
+		keys []string
+	)
+	err = s.tx.WithinTx(ctx, func(ctx context.Context) error {
+		n, keys, err = s.repo.DeleteRestaurants(ctx, ids)
+		return err
+	})
+	if err != nil {
+		return 0, err
+	}
+	s.deleteImages(keys)
+	return n, nil
+}
+
+// checkIDs dedupes and bounds a bulk delete.
+func checkIDs(ids []int64) ([]int64, error) {
+	ids = slices.Compact(slices.Sorted(slices.Values(ids)))
+	if len(ids) == 0 || len(ids) > model.MaxDelete || ids[0] <= 0 {
+		return nil, model.ErrDeleteIDs
+	}
+	return ids, nil
+}
+
+// deleteImages runs after commit. A failure only leaks storage, so it is
+// logged, not returned (like the restaurant service).
+func (s *service) deleteImages(keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for chunk := range slices.Chunk(keys, 1000) { // S3 deletes at most 1000 keys per call
+		if err := s.images.Delete(ctx, chunk...); err != nil {
+			slog.Warn("delete image objects", "count", len(chunk), "err", err)
+		}
+	}
 }
 
 func checkReason(reason string) (string, error) {

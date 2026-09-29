@@ -57,7 +57,7 @@ func New(pool *pgxpool.Pool, opts Options) *gin.Engine {
 	restaurant.RegisterRoutes(api, restaurant.NewModule(db, opts.Images, opts.ImageBaseURL))
 	reservation.RegisterRoutes(api, reservation.NewModule(db, opts.ImageBaseURL))
 	review.RegisterRoutes(api, review.NewModule(db))
-	admin.RegisterRoutes(api, admin.NewModule(db))
+	admin.RegisterRoutes(api, admin.NewModule(db, opts.Images))
 	profile.RegisterRoutes(api, profile.NewModule(db, opts.ImageBaseURL))
 	return r
 }

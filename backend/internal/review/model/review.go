@@ -25,6 +25,22 @@ type Review struct {
 	OwnerID   int64     `json:"-"` // the restaurant's owner, for the privacy rule
 }
 
+// ListQuery pages a restaurant's reviews (R-REVIEW-8).
+type ListQuery struct {
+	Rating int    // 1 to 5 shows only that star rating; 0 shows all
+	Sort   string // "newest" (default) or "oldest", by last update
+	Limit  int
+	Offset int
+}
+
+// Page is one page of reviews. Total counts the reviews that match Rating;
+// RatingCounts has every star level ("1" to "5"), whatever the filter.
+type Page struct {
+	Reviews      []Review    `json:"reviews"`
+	Total        int         `json:"total"`
+	RatingCounts map[int]int `json:"rating_counts"`
+}
+
 type Input struct {
 	Rating int    `json:"rating"`
 	Body   string `json:"body"`
@@ -34,4 +50,6 @@ var (
 	ErrRating    = apperr.New(apperr.Invalid, "R-REVIEW-1", "rating must be a whole number from 1 to 5")
 	ErrBody      = apperr.New(apperr.Invalid, "R-REVIEW-1", "review text must be 1 to 2000 characters")
 	ErrOwnReview = apperr.New(apperr.Forbidden, "R-REVIEW-3", "you can't review your own restaurant")
+	ErrSort      = apperr.InvalidInput("sort must be newest or oldest")
+	ErrFilter    = apperr.InvalidInput("rating filter must be 1 to 5")
 )
