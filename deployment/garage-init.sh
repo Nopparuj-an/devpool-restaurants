@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # One-time (idempotent) Garage setup: node layout, API key, bucket, website mode.
 # Run after `make up`:  make garage-init
+# Production: make prod-garage-init (COMPOSE_FILE and GARAGE_SERVICE select the stack).
 set -euo pipefail
 cd "$(dirname "$0")"
 set -a; source .env; set +a
 
-g() { docker compose exec -T -e RUST_LOG=warn garage /garage "$@"; }
+g() { docker compose exec -T -e RUST_LOG=warn "${GARAGE_SERVICE:-garage}" /garage "$@"; }
 
 echo "waiting for garage..."
 for _ in $(seq 1 30); do g status >/dev/null 2>&1 && break; sleep 1; done

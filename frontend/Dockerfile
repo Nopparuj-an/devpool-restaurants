@@ -15,10 +15,6 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Rewrite destinations are baked in at build time (next.config.ts).
-ARG API_URL=http://api:8080
-ARG IMAGES_URL=http://restaurant-images.web.garage.localhost:3902
-ENV API_URL=$API_URL IMAGES_URL=$IMAGES_URL
 # webpack, not Turbopack: Turbopack's production build was OOM-killed in a
 # 2 GB Docker VM (Rancher Desktop default); webpack needs far less memory.
 RUN pnpm exec next build --webpack
@@ -26,6 +22,9 @@ RUN pnpm exec next build --webpack
 FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+# Read per request by proxy.ts; override at `docker run` / in compose.
+ENV API_URL=http://api:8080 \
+    IMAGES_URL=http://restaurant-images.web.garage.localhost:3902
 COPY --from=build --chown=node:node /app/public ./public
 COPY --from=build --chown=node:node /app/.next/standalone ./
 COPY --from=build --chown=node:node /app/.next/static ./.next/static

@@ -19,3 +19,4 @@ One file per decision: `NNNN-short-title.md`. Each has a Status (`Proposed` | `A
 | [0013](0013-client-side-data-loading.md) | Data loads in the browser with TanStack Query; `/api` proxied, cookie unchanged | Accepted |
 | [0014](0014-admin-impersonation.md) | Admin impersonation as a marked session, one cookie, dies with admin rights | Accepted |
 | [0015](0015-rating-totals-by-trigger.md) | Rating totals recomputed by DB triggers, CHECK-guarded | Accepted |
+| [0016](0016-image-publishing.md) | Images built by GitHub Actions to GHCR, deployed by Watchtower | Accepted |

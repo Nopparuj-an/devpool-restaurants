@@ -8,7 +8,7 @@ HOST_ENV = set -a && . ../$(ENV_FILE) && set +a && \
 	  export DATABASE_URL="postgres://$$POSTGRES_USER:$$POSTGRES_PASSWORD@localhost:5432/$$POSTGRES_DB?sslmode=disable" \
 	  S3_ENDPOINT=http://localhost:3900 COOKIE_SECURE=false
 
-.PHONY: help env up down ps logs garage-init psql admin admin-revoke api seed seed-bulk seed-bulk-remove ratings-recompute test fmt vet app-up app-down app-logs app-seed
+.PHONY: help env up down ps logs garage-init psql admin admin-revoke api seed seed-bulk seed-bulk-remove ratings-recompute test fmt vet app-up app-down app-logs app-seed prod-garage-init prod-seed
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-12s %s\n",$$1,$$2}'
@@ -76,6 +76,12 @@ logs: ## Tail infra logs
 
 garage-init: ## One-time Garage layout/key/bucket setup (idempotent)
 	deployment/garage-init.sh
+
+prod-garage-init: ## Garage setup in the production stack (docker-compose.prod.yml)
+	COMPOSE_FILE=docker-compose.prod.yml GARAGE_SERVICE=restaurants-garage deployment/garage-init.sh
+
+prod-seed: ## Load demo data into the production stack (run prod-garage-init first)
+	docker compose -f deployment/docker-compose.prod.yml run --rm --entrypoint /seed restaurants-api
 
 ratings-recompute: ## Rebuild every restaurant's rating totals from its reviews (ADR-0015)
 	$(COMPOSE) exec -T postgres sh -c 'psql -U $$POSTGRES_USER -d $$POSTGRES_DB -c "SELECT recompute_ratings(ARRAY(SELECT id FROM restaurants))"'

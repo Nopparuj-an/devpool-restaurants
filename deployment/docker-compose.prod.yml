@@ -1,0 +1,163 @@
+name: restaurants-app
+
+# Self-contained production stack behind an existing Traefik: web, api,
+# Postgres and Garage, all state in named volumes. `docker compose down -v`
+# removes everything.
+# Prebuilt images come from GHCR (.github/workflows/publish.yml, ADR-0016).
+#
+#   make env                    # deployment/.env with random secrets
+#   docker compose -f docker-compose.prod.yml up -d
+#   make prod-garage-init       # once: Garage layout, key, bucket, website mode
+#   make prod-seed              # optional: demo data
+#
+# Networks:
+#   proxy    Traefik's existing network (external, named exactly `proxy`).
+#            Only web joins it: it is the one public entry point and proxies
+#            /api and /images itself (ADR-0013, ADR-0016).
+#   internal private to this stack (web -> api -> postgres, web/api -> garage).
+#
+# Service names carry a `restaurants-` prefix because web is on the shared
+# proxy network, where Docker DNS registers its name for other stacks too.
+#
+# Hardening on every container: no capabilities, no privilege escalation,
+# read-only root filesystem (writable tmpfs only where needed), PID and
+# memory limits, no published ports (Traefik reaches them over the network).
+
+x-hardened: &hardened
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 256
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  # No published ports, reachable only on `internal`. Runs as the image's
+  # postgres user (uid 70) directly, since the entrypoint's chown/gosu step
+  # needs capabilities that are dropped here; the volume inherits its owner
+  # from the image's data directory.
+  restaurants-postgres:
+    <<: *hardened
+    image: postgres:16-alpine
+    user: "70:70"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?run `make env` to create .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run `make env` to create .env}
+      POSTGRES_DB: ${POSTGRES_DB:?run `make env` to create .env}
+      TZ: UTC
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp
+      - /run/postgresql
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [internal]
+
+  restaurants-api:
+    <<: *hardened
+    image: ghcr.io/nopparuj-an/restaurants-api:latest
+    # Runs as the image's non-root user. Only the variables the API reads, not
+    # the whole .env (the Garage secrets, for one, stay out).
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@restaurants-postgres:5432/${POSTGRES_DB}?sslmode=disable
+      S3_ENDPOINT: http://restaurants-garage:3900
+      S3_REGION: ${S3_REGION:-garage}
+      S3_BUCKET: ${S3_BUCKET:-restaurant-images}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID in .env}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY in .env}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-https://restaurants.anan.ovh/api/auth/google/callback}
+      COOKIE_SECURE: "true" # served over HTTPS by Traefik
+    tmpfs: [/tmp]
+    mem_limit: 512m
+    depends_on:
+      restaurants-postgres:
+        condition: service_healthy
+      restaurants-garage:
+        condition: service_started
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks: [internal]
+
+  restaurants-web:
+    <<: *hardened
+    image: ghcr.io/nopparuj-an/restaurants-web:latest
+    # Runs as the image's non-root `node` user. Where /api and /images are
+    # proxied to, read per request (frontend/proxy.ts).
+    environment:
+      API_URL: ${API_URL:-http://restaurants-api:8080}
+      IMAGES_URL: ${IMAGES_URL:-http://restaurant-images.web.garage.localhost:3902}
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1000,gid=1000
+    mem_limit: 768m
+    depends_on:
+      restaurants-api:
+        condition: service_healthy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.services.restaurants.loadbalancer.server.port=3000"
+      - "traefik.http.routers.restaurants.entrypoints=http,https"
+      - "traefik.http.routers.restaurants.rule=Host(`restaurants.anan.ovh`)"
+      - "traefik.http.routers.restaurants-secure.tls=true"
+      - "traefik.http.routers.restaurants-secure.tls.options=cloudflare-strict@file"
+      - "traefik.http.routers.restaurants-secure.entrypoints=https"
+      - "traefik.http.routers.restaurants-secure.rule=Host(`restaurants.anan.ovh`)"
+    networks: [internal, proxy]
+
+  # Garage picks the bucket from the Host header (ADR-0005); the internal alias
+  # below is the host name the web app's /images proxy uses.
+  restaurants-garage:
+    <<: *hardened
+    image: dxflrs/garage:v2.4.1
+    # The image has no non-root user and no shell to chown the volumes, so it
+    # runs as root, but with no capabilities and a read-only filesystem.
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?set GARAGE_RPC_SECRET in .env}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN:?set GARAGE_ADMIN_TOKEN in .env}
+    volumes:
+      - ./garage/garage.toml:/etc/garage.toml:ro
+      - garage-meta:/var/lib/garage/meta
+      - garage-data:/var/lib/garage/data
+    tmpfs: [/tmp]
+    mem_limit: 1g
+    networks:
+      internal:
+        aliases: [restaurant-images.web.garage.localhost]
+
+  # Optional: skip it if you already run Watchtower (it only touches labelled
+  # containers either way). `docker compose --profile watchtower up -d`.
+  # The Docker socket is root-equivalent on the host: that is the price of
+  # auto-updates, so this container gets nothing else.
+  watchtower:
+    <<: *hardened
+    image: containrrr/watchtower:latest
+    profiles: [watchtower]
+    command: --label-enable --cleanup --interval 60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Private GHCR packages: also mount your `docker login ghcr.io` file:
+      # - ${HOME}/.docker/config.json:/config.json:ro
+    mem_limit: 128m
+
+volumes:
+  postgres-data:
+  garage-meta:
+  garage-data:
+
+networks:
+  internal:
+  proxy:
+    external: true
