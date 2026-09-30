@@ -29,7 +29,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [go, javascript-typescript, actions]
+        # Only Go can autobuild; JS/TS and Actions are source-only (none).
+        include:
+          - { language: go, build-mode: autobuild }
+          - { language: javascript-typescript, build-mode: none }
+          - { language: actions, build-mode: none }
     steps:
       - uses: actions/checkout@v7
       - if: matrix.language == 'go'
@@ -40,7 +44,7 @@ jobs:
       - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          build-mode: autobuild
+          build-mode: ${{ matrix.build-mode }}
           queries: security-extended
       - uses: github/codeql-action/analyze@v4
         with:

@@ -1,25 +1,26 @@
 # Weekly dependency update PRs (free on all repos). Minor/patch bumps are
 # grouped per ecosystem to keep the PR count low.
-version: 2
-updates:
-  - package-ecosystem: gomod
-    directory: /backend
-    schedule: { interval: weekly }
-    groups:
-      go-minor: { update-types: [minor, patch] }
 
-  - package-ecosystem: npm
-    directory: /frontend
-    schedule: { interval: weekly }
-    groups:
-      npm-minor: { update-types: [minor, patch] }
+# version: 2
+# updates:
+#   - package-ecosystem: gomod
+#     directory: /backend
+#     schedule: { interval: weekly }
+#     groups:
+#       go-minor: { update-types: [minor, patch] }
 
-  - package-ecosystem: docker
-    directories: [/backend, /frontend]
-    schedule: { interval: weekly }
+#   - package-ecosystem: npm
+#     directory: /frontend
+#     schedule: { interval: weekly }
+#     groups:
+#       npm-minor: { update-types: [minor, patch] }
 
-  - package-ecosystem: github-actions
-    directory: /
-    schedule: { interval: weekly }
-    groups:
-      actions: { patterns: ["*"] }
+#   - package-ecosystem: docker
+#     directories: [/backend, /frontend]
+#     schedule: { interval: weekly }
+
+#   - package-ecosystem: github-actions
+#     directory: /
+#     schedule: { interval: weekly }
+#     groups:
+#       actions: { patterns: ["*"] }
