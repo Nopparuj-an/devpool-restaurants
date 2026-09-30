@@ -96,10 +96,12 @@ type Detail struct {
 }
 
 type ListQuery struct {
-	Sort    string // "top_rated" (default) | "most_reviewed" | "newest"
-	Q       string // name or cuisine contains, case-insensitive
-	Cuisine string // exact, case-insensitive
-	OwnerID int64  // 0 = any
+	Sort string // "top_rated" (default) | "most_reviewed" | "newest"
+	// Ascending flips the sort direction (default is best/most/newest first).
+	Ascending bool
+	Q         string // name or cuisine contains, case-insensitive
+	Cuisine   string // exact, case-insensitive
+	OwnerID   int64  // 0 = any
 	// IncludeHidden also lists banned restaurants (the owner's own list, admins).
 	IncludeHidden bool
 	Limit         int

@@ -23,7 +23,7 @@ Every 🔒 route answers `401` with a code that says why: `unauthorized` (no ses
 ## Restaurants
 | Method | Path | Body / query | Returns |
 |---|---|---|---|
-| GET | `/restaurants` | `?sort=top_rated\|most_reviewed\|newest&q=&cuisine=&owner_id=&limit=&offset=` (`q` matches name or cuisine; limit ≤ 100, default 50). With `owner_id`, the owner and admins also get hidden ones | `{restaurants: Summary[], total}` |
+| GET | `/restaurants` | `?sort=top_rated\|most_reviewed\|newest&order=desc\|asc&q=&cuisine=&owner_id=&limit=&offset=` (`order=asc` reverses the sort, default `desc`; `q` matches name or cuisine; limit ≤ 100, default 50). With `owner_id`, the owner and admins also get hidden ones | `{restaurants: Summary[], total}` |
 | GET | `/restaurants/{id}` | – | Detail. `can_manage` for the owner and admins, who also get `upcoming_reservations` |
 | POST 🔒 | `/restaurants` | multipart: `data` = Input JSON, `images` = 1 to 10 files, 10 MB each (the first is the cover) | `201` Detail |
 | PUT 🔒 | `/restaurants/{id}` | Input JSON (owner or admin, `timezone` ignored) | Detail |

@@ -11,8 +11,13 @@ export function Textarea({ className = "", ...props }: ComponentProps<"textarea"
   return <textarea className={`${control} min-h-24 py-2 leading-relaxed ${className}`} {...props} />;
 }
 
+// The native arrow is dropped for a chevron drawn as a background, so it sits
+// the same in every browser.
+const chevron =
+  "appearance-none bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2016%2016%27%20fill=%27none%27%20stroke=%27%236b7280%27%20stroke-width=%271.5%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27%3E%3Cpath%20d=%27m4%206%204%204%204-4%27/%3E%3C/svg%3E)] bg-size-[1rem] bg-position-[right_0.75rem_center] bg-no-repeat";
+
 export function Select({ className = "", ...props }: ComponentProps<"select">) {
-  return <select className={`${control} h-10 pr-8 ${className}`} {...props} />;
+  return <select className={`${control} ${chevron} h-10 pr-9 ${className}`} {...props} />;
 }
 
 // A labelled control with optional hint and error text.

@@ -50,6 +50,7 @@ import type {
   Review,
   ReviewSort,
   SortKey,
+  SortOrder,
 } from "@/lib/types";
 import { useTimeZone } from "@/lib/use-time-zone";
 
@@ -70,6 +71,7 @@ export function HomeScreen({
   restaurants,
   total,
   sort,
+  order = "desc",
   query,
   onSort,
   onQuery,
@@ -80,7 +82,9 @@ export function HomeScreen({
   restaurants: RestaurantSummary[];
   total: number;
   sort: SortKey;
+  order?: SortOrder;
   query: string;
+  // Clicking the active sort again flips the order; the route handles that.
   onSort: (sort: SortKey) => void;
   onQuery: (query: string) => void;
   onMore?: () => Promise<void>;
@@ -110,7 +114,7 @@ export function HomeScreen({
               aria-label="Search restaurants"
             />
           </div>
-          <Segmented label="Sort by" options={SORTS} value={sort} onChange={onSort} />
+          <Segmented label="Sort by" options={SORTS} value={sort} onChange={onSort} direction={order} />
         </div>
         {query && (
           <p className="-mt-4 mb-6 text-sm text-muted">

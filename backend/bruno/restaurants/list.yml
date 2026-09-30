@@ -10,6 +10,9 @@ http:
     - name: sort
       value: "top_rated"
       type: query
+    - name: order
+      value: "desc"
+      type: query
     - name: limit
       value: "24"
       type: query
@@ -20,7 +23,7 @@ http:
 
 docs:
   content: |-
-    `sort`: top_rated (Bayesian, ADR-0004), most_reviewed, newest. Returns `{restaurants, total}`.
+    `sort`: top_rated (Bayesian, ADR-0004), most_reviewed, newest. `order`: desc (default) or asc. Returns `{restaurants, total}`.
   type: text/markdown
 
 settings:

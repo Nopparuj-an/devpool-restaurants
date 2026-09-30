@@ -37,7 +37,7 @@ func actor(c *gin.Context) model.Actor {
 	return model.Actor{ID: id, Admin: admin}
 }
 
-// List takes ?sort=&q=&cuisine=&owner_id=&limit=&offset=. With owner_id (a
+// List takes ?sort=&order=asc|desc&q=&cuisine=&owner_id=&limit=&offset=. With owner_id (a
 // profile page), the owner and admins also see hidden restaurants.
 func (h *Handler) List(c *gin.Context) error {
 	limit, _ := strconv.Atoi(c.Query("limit"))
@@ -45,7 +45,7 @@ func (h *Handler) List(c *gin.Context) error {
 	ownerID, _ := strconv.ParseInt(c.Query("owner_id"), 10, 64)
 	viewer, admin := auth.Viewer(c)
 	list, total, err := h.svc.List(c.Request.Context(), model.ListQuery{
-		Sort: c.Query("sort"), Q: c.Query("q"), Cuisine: c.Query("cuisine"), Limit: limit, Offset: offset,
+		Sort: c.Query("sort"), Ascending: c.Query("order") == "asc", Q: c.Query("q"), Cuisine: c.Query("cuisine"), Limit: limit, Offset: offset,
 		OwnerID: ownerID, IncludeHidden: ownerID > 0 && (admin || viewer == ownerID),
 	})
 	if err != nil {

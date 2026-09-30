@@ -1,6 +1,6 @@
 "use client";
 
-import { Minus, Plus, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, Plus, Star } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { Button } from "./button";
@@ -11,11 +11,14 @@ export function Segmented<T extends string>({
   value,
   onChange,
   label,
+  direction,
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
   label: string;
+  // Shows an arrow next to the selected option (sorting).
+  direction?: "asc" | "desc";
 }) {
   return (
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg bg-surface p-0.5">
@@ -31,6 +34,14 @@ export function Segmented<T extends string>({
           }`}
         >
           {o.label}
+          {direction && o.value === value && <span className="sr-only">{direction === "asc" ? ", ascending" : ", descending"}</span>}
+          {direction &&
+            o.value === value &&
+            (direction === "asc" ? (
+              <ArrowUp aria-hidden className="ml-1 inline size-3.5" />
+            ) : (
+              <ArrowDown aria-hidden className="ml-1 inline size-3.5" />
+            ))}
         </button>
       ))}
     </div>

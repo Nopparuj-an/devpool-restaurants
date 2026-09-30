@@ -176,10 +176,14 @@ func (r *Repository) List(ctx context.Context, q model.ListQuery) ([]model.Summa
 	if !q.IncludeHidden {
 		where = append(where, Visible)
 	}
+	dir := "DESC"
+	if q.Ascending {
+		dir = "ASC"
+	}
 	order := map[string]string{
-		"":              fmt.Sprintf("(r.rating_sum + %[1]d * g.c) / (r.review_count + %[1]d) DESC, r.review_count DESC, r.name", bayesianPrior),
-		"most_reviewed": "r.review_count DESC, r.name",
-		"newest":        "r.created_at DESC, r.id DESC",
+		"":              fmt.Sprintf("(r.rating_sum + %[1]d * g.c) / (r.review_count + %[1]d) %[2]s, r.review_count %[2]s, r.name", bayesianPrior, dir),
+		"most_reviewed": "r.review_count " + dir + ", r.name",
+		"newest":        "r.created_at " + dir + ", r.id " + dir,
 	}
 	order["top_rated"] = order[""]
 

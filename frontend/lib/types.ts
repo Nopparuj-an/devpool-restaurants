@@ -104,6 +104,7 @@ export type ProfileReview = {
 export type ProfileReviewPage = { reviews: ProfileReview[]; total: number };
 
 export type SortKey = "top_rated" | "most_reviewed" | "newest";
+export type SortOrder = "asc" | "desc";
 
 // List responses carry the total number of matches for paging.
 export type RestaurantPage = { restaurants: RestaurantSummary[]; total: number };

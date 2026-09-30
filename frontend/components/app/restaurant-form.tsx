@@ -257,7 +257,7 @@ export function RestaurantForm({
                 {r.open ? (
                   <div className="flex items-center gap-2">
                     <Select
-                      className="w-24"
+                      className="w-28!"
                       value={r.from}
                       onChange={(e) => setRow(d, { from: e.target.value })}
                       aria-label={`${WEEKDAYS[d]} opens`}
@@ -268,7 +268,7 @@ export function RestaurantForm({
                     </Select>
                     <span className="text-sm text-muted">to</span>
                     <Select
-                      className="w-24"
+                      className="w-28!"
                       value={r.to}
                       onChange={(e) => setRow(d, { to: e.target.value })}
                       aria-label={`${WEEKDAYS[d]} closes`}
@@ -277,7 +277,7 @@ export function RestaurantForm({
                         <option key={t}>{t}</option>
                       ))}
                     </Select>
-                    {hintFor(r) && <span className="text-xs text-muted">{hintFor(r)}</span>}
+                    {hintFor(r) && <span className="whitespace-nowrap text-xs text-muted">{hintFor(r)}</span>}
                   </div>
                 ) : (
                   <span className="text-sm text-faint">Closed</span>

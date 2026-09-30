@@ -50,6 +50,7 @@ import type {
   ReviewPage,
   ReviewSort,
   SortKey,
+  SortOrder,
 } from "@/lib/types";
 import { useTimeZone } from "@/lib/use-time-zone";
 
@@ -110,9 +111,10 @@ export function HomeRoute() {
   const router = useRouter();
   const params = useSearchParams();
   const sort = SORTS.includes(params.get("sort") as SortKey) ? (params.get("sort") as SortKey) : "top_rated";
+  const order: SortOrder = params.get("order") === "asc" ? "asc" : "desc";
   const query = (params.get("q") ?? "").trim().slice(0, 100);
 
-  const apiParams = new URLSearchParams({ sort, limit: String(HOME_PAGE_SIZE) });
+  const apiParams = new URLSearchParams({ sort, order, limit: String(HOME_PAGE_SIZE) });
   if (query) apiParams.set("q", query);
   const me = useAccount();
   const list = useInfiniteQuery({
@@ -125,15 +127,17 @@ export function HomeRoute() {
   });
 
   const href = useCallback(
-    (p: { sort?: SortKey; query?: string }) => {
+    (p: { sort?: SortKey; order?: SortOrder; query?: string }) => {
       const q = new URLSearchParams();
       const nextSort = p.sort ?? sort;
+      const nextOrder = p.order ?? order;
       const nextQuery = p.query ?? query;
       if (nextSort !== "top_rated") q.set("sort", nextSort);
+      if (nextOrder === "asc") q.set("order", nextOrder);
       if (nextQuery) q.set("q", nextQuery);
       return q.size ? `/?${q}` : "/";
     },
-    [sort, query],
+    [sort, order, query],
   );
   const onQuery = useCallback((q: string) => router.replace(href({ query: q })), [router, href]);
 
@@ -146,8 +150,10 @@ export function HomeRoute() {
       restaurants={unique(pages.flatMap((p) => p.restaurants))}
       total={pages[0].total}
       sort={sort}
+      order={order}
       query={query}
-      onSort={(s) => router.push(href({ sort: s }))}
+      // Picking another sort resets to the default direction; the same one flips it.
+      onSort={(s) => router.push(href({ sort: s, order: s === sort && order === "desc" ? "asc" : "desc" }))}
       onQuery={onQuery}
       onMore={async () => {
         await list.fetchNextPage();
