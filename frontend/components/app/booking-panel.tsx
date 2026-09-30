@@ -129,22 +129,7 @@ export function BookingPanel({
         {availability?.limited && <Badge tone="warning">Limited seats left</Badge>}
       </div>
 
-      {locked && (
-        <div className="flex flex-col gap-3 rounded-lg bg-accent-soft p-4 text-sm">
-          <p className="font-medium">Log in to book a table.</p>
-          <p className="text-muted">You can look at the times, but booking needs an account.</p>
-          <div className="flex gap-2">
-            <ButtonLink size="sm" href={`/login?next=${encodeURIComponent(here)}`}>
-              Log in
-            </ButtonLink>
-            <ButtonLink size="sm" variant="secondary" href={`/signup?next=${encodeURIComponent(here)}`}>
-              Sign up
-            </ButtonLink>
-          </div>
-        </div>
-      )}
-
-      <fieldset disabled={locked} className={`m-0 flex min-w-0 flex-col gap-5 border-0 p-0 ${locked ? "opacity-50 saturate-0" : ""}`}>
+      <div className="flex min-w-0 flex-col gap-5">
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           {days.map((d) => (
             <button
@@ -215,13 +200,26 @@ export function BookingPanel({
               <span className="text-muted">Pick a time to continue.</span>
             )}
           </p>
-          <Button onClick={submit} disabled={!chosen || busy}>
+          <Button onClick={submit} disabled={locked || !chosen || busy}>
             {busy ? "Saving…" : editing ? "Save changes" : "Book table"}
           </Button>
+          {locked && (
+            <div className="flex flex-col gap-3 rounded-lg bg-accent-soft p-4 text-sm">
+              <p className="font-medium">Log in to book a table.</p>
+              <div className="flex gap-2">
+                <ButtonLink size="sm" href={`/login?next=${encodeURIComponent(here)}`}>
+                  Log in
+                </ButtonLink>
+                <ButtonLink size="sm" variant="secondary" href={`/signup?next=${encodeURIComponent(here)}`}>
+                  Sign up
+                </ButtonLink>
+              </div>
+            </div>
+          )}
           <p className="text-xs text-muted">You can change or cancel up to {fmt.duration(cutoffMinutes)} before your booking starts.</p>
           {status && <Notice tone={status.tone}>{status.text}</Notice>}
         </div>
-      </fieldset>
+      </div>
     </div>
   );
 }
