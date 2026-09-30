@@ -91,7 +91,7 @@ func TestTotalsRepairAndGuard(t *testing.T) {
 	for _, sql := range []string{
 		`UPDATE restaurants SET rating_sum = -1 WHERE id = $1`,
 		`UPDATE restaurants SET review_count = -1, rating_sum = 0 WHERE id = $1`,
-		`UPDATE restaurants SET rating_sum = 6 WHERE id = $1`, // 1 review can't sum to 6
+		`UPDATE restaurants SET rating_sum = 6 WHERE id = $1`,                // 1 review can't sum to 6
 		`UPDATE restaurants SET rating_counts = '{1,0,0,0,0}' WHERE id = $1`, // counts must match the 5★ total
 	} {
 		if _, err := env.DB.Exec(context.Background(), sql, id); err == nil {
