@@ -4,13 +4,7 @@
 // TanStack Query (lib/queries.ts), and hands data and callbacks to the same
 // screens the /design gallery renders with mock data. app/**/page.tsx files
 // only set the title and render one of these.
-import {
-  keepPreviousData,
-  useInfiniteQuery,
-  useQuery,
-  useQueryClient,
-  type UseQueryResult,
-} from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -35,14 +29,7 @@ import {
 } from "@/components/screens/screens";
 import { api, ApiError, get, getOrNull } from "@/lib/api-client";
 import { dayKey, dayRange, upcomingDays } from "@/lib/days";
-import {
-  ADMIN_DELETE_CHUNK,
-  ADMIN_PAGE_SIZE,
-  ADMIN_PAGE_SIZES,
-  BOOKINGS_PAGE_SIZE,
-  HOME_PAGE_SIZE,
-  REVIEWS_PAGE_SIZE,
-} from "@/lib/paging";
+import { ADMIN_DELETE_CHUNK, ADMIN_PAGE_SIZE, ADMIN_PAGE_SIZES, BOOKINGS_PAGE_SIZE, HOME_PAGE_SIZE, REVIEWS_PAGE_SIZE } from "@/lib/paging";
 import { keys, useAccount, useRefresh, useRequireAccount } from "@/lib/queries";
 import type {
   Account,
@@ -694,7 +681,11 @@ function useSelection(kind: "users" | "restaurants") {
       const chunk = ids.slice(i, i + ADMIN_DELETE_CHUNK);
       const res = await api("POST", `/admin/${kind}/delete`, { ids: chunk });
       if (res.error) error = res.error;
-      else onSelect(chunk.map((id) => ({ id, name: "" })), false);
+      else
+        onSelect(
+          chunk.map((id) => ({ id, name: "" })),
+          false,
+        );
     }
     await refresh();
     return { error };
@@ -724,15 +715,7 @@ export function AdminUsersRoute() {
   const wait = gateAdmin(me, users);
   if (wait) return wait;
   return (
-    <AdminUsersScreen
-      account={me.data!}
-      {...list}
-      {...nav}
-      {...bulk}
-      users={users.data!.users}
-      total={users.data!.total}
-      onBan={ban}
-    />
+    <AdminUsersScreen account={me.data!} {...list} {...nav} {...bulk} users={users.data!.users} total={users.data!.total} onBan={ban} />
   );
 }
 

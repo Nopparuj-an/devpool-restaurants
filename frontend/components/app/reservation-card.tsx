@@ -50,12 +50,12 @@ export function ReservationCard({
                 <Button size="sm" variant="ghost" onClick={onCancel}>
                   Cancel booking
                 </Button>
-                <span className="text-xs text-muted">Until {fmt.time(r.modifiable_until, tz)} on {fmt.day(r.modifiable_until, tz)}</span>
+                <span className="text-xs text-muted">
+                  Until {fmt.time(r.modifiable_until, tz)} on {fmt.day(r.modifiable_until, tz)}
+                </span>
               </>
             ) : (
-              <span className="text-xs text-muted">
-                Too late to change or cancel. The cutoff was {fmt.time(r.modifiable_until, tz)}.
-              </span>
+              <span className="text-xs text-muted">Too late to change or cancel. The cutoff was {fmt.time(r.modifiable_until, tz)}.</span>
             )}
           </div>
         )}

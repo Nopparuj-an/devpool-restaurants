@@ -10,26 +10,14 @@ import { useTimeZone } from "@/lib/use-time-zone";
 const SLOT_MS = 15 * 60 * 1000;
 
 // Guests in the room per 15-minute slot, as a bar chart over opening hours.
-export function LoadStrip({
-  reservations,
-  seats,
-  from,
-  to,
-}: {
-  reservations: Reservation[];
-  seats: number;
-  from: string;
-  to: string;
-}) {
+export function LoadStrip({ reservations, seats, from, to }: { reservations: Reservation[]; seats: number; from: string; to: string }) {
   const tz = useTimeZone();
   const start = Date.parse(from);
   const end = Date.parse(to);
   const active = reservations.filter((r) => r.status === "active");
   const bars = [];
   for (let t = start; t < end; t += SLOT_MS) {
-    const load = active
-      .filter((r) => Date.parse(r.starts_at) <= t && Date.parse(r.ends_at) > t)
-      .reduce((sum, r) => sum + r.pax, 0);
+    const load = active.filter((r) => Date.parse(r.starts_at) <= t && Date.parse(r.ends_at) > t).reduce((sum, r) => sum + r.pax, 0);
     bars.push({ t, load });
   }
   const peak = Math.max(0, ...bars.map((b) => b.load));
@@ -53,9 +41,11 @@ export function LoadStrip({
         ))}
       </div>
       <div className="flex justify-between text-xs text-faint tabular-nums">
-        {hours.filter((_, i) => i % 2 === 0).map((b) => (
-          <span key={b.t}>{fmt.time(new Date(b.t).toISOString(), tz)}</span>
-        ))}
+        {hours
+          .filter((_, i) => i % 2 === 0)
+          .map((b) => (
+            <span key={b.t}>{fmt.time(new Date(b.t).toISOString(), tz)}</span>
+          ))}
       </div>
     </figure>
   );
@@ -89,9 +79,7 @@ export function OwnerTable({ reservations }: { reservations: Reservation[] }) {
                 )}
               </td>
               <td className="px-4 py-3 text-muted">{r.customer?.email}</td>
-              <td className="px-4 py-3">
-                {r.status === "cancelled" ? <Badge>Cancelled</Badge> : <Badge tone="accent">Booked</Badge>}
-              </td>
+              <td className="px-4 py-3">{r.status === "cancelled" ? <Badge>Cancelled</Badge> : <Badge tone="accent">Booked</Badge>}</td>
             </tr>
           ))}
         </tbody>

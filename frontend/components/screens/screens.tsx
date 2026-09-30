@@ -224,8 +224,7 @@ export function RestaurantScreen({
           {r.is_owner && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-accent-soft px-4 py-3 text-sm">
               <span>
-                This is your restaurant. {r.upcoming_reservations ?? 0} upcoming{" "}
-                {r.upcoming_reservations === 1 ? "booking" : "bookings"}.
+                This is your restaurant. {r.upcoming_reservations ?? 0} upcoming {r.upcoming_reservations === 1 ? "booking" : "bookings"}.
               </span>
               <span className="flex gap-2">
                 <ButtonLink size="sm" variant="secondary" href={`/me/restaurants/${r.id}/bookings`}>
@@ -303,7 +302,11 @@ export function RestaurantScreen({
                 {reviewRating > 0 && (
                   <p className="text-sm text-muted">
                     Showing {fmt.count(reviewsTotal ?? others.length, `${reviewRating} star review`)}.{" "}
-                    <button type="button" className="text-accent hover:underline" onClick={() => onReviewFilter?.({ rating: 0, sort: reviewSort })}>
+                    <button
+                      type="button"
+                      className="text-accent hover:underline"
+                      onClick={() => onReviewFilter?.({ rating: 0, sort: reviewSort })}
+                    >
                       Show all
                     </button>
                   </p>
@@ -417,10 +420,7 @@ export function MyRestaurantsScreen({ account, restaurants }: { account: Account
           }
         />
         {restaurants.length === 0 ? (
-          <EmptyState
-            title="You don't have a restaurant yet"
-            action={<ButtonLink href="/me/restaurants/new">Add restaurant</ButtonLink>}
-          >
+          <EmptyState title="You don't have a restaurant yet" action={<ButtonLink href="/me/restaurants/new">Add restaurant</ButtonLink>}>
             Add one and customers can start booking it right away.
           </EmptyState>
         ) : (
@@ -681,7 +681,13 @@ export function AdminRestaurantsScreen({ restaurants, ...p }: AdminListProps & {
       <Page>
         <PageTitle title="Admin" subtitle={`${p.total.toLocaleString("en")} ${p.total === 1 ? "restaurant" : "restaurants"}`} />
         <AdminTabs current="restaurants" />
-        <AdminFilters query={p.query} status={p.status} placeholder="Search by name, cuisine or owner email" onQuery={p.onQuery} onStatus={p.onStatus} />
+        <AdminFilters
+          query={p.query}
+          status={p.status}
+          placeholder="Search by name, cuisine or owner email"
+          onQuery={p.onQuery}
+          onStatus={p.onStatus}
+        />
         {bulk.bar}
         {restaurants.length === 0 ? (
           <EmptyState title="No restaurants match" />
@@ -836,8 +842,7 @@ export function ProfileScreen({
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <h1 className="text-2xl font-semibold tracking-tight">{p.display_name}</h1>
             <p className="text-sm text-muted">
-              Joined {fmt.day(p.created_at, tz)} · {fmt.count(p.review_count, "review")} ·{" "}
-              {fmt.count(p.restaurant_count, "restaurant")}
+              Joined {fmt.day(p.created_at, tz)} · {fmt.count(p.review_count, "review")} · {fmt.count(p.restaurant_count, "restaurant")}
             </p>
           </div>
           <div className="flex gap-2">

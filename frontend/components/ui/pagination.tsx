@@ -9,15 +9,7 @@ import { buttonClass } from "./button";
 // Previous / next links with "Page 2 of 17". Links (not buttons) so pages are
 // shareable and the back button works. Admin lists use it; public lists grow
 // with LoadMore instead.
-export function Pagination({
-  page,
-  pageCount,
-  hrefFor,
-}: {
-  page: number;
-  pageCount: number;
-  hrefFor: (page: number) => string;
-}) {
+export function Pagination({ page, pageCount, hrefFor }: { page: number; pageCount: number; hrefFor: (page: number) => string }) {
   if (pageCount <= 1) return null;
   const link = (to: number, label: string, icon: React.ReactNode, disabled: boolean) =>
     disabled ? (

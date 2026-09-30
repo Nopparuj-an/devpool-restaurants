@@ -52,15 +52,35 @@ writeFileSync(PHOTO, png(64, 48));
 const BIG_PHOTO = join(SHOTS, "big-photo.png");
 writeFileSync(BIG_PHOTO, png(2400, 1600));
 const port = 9800 + Math.floor(Math.random() * 100);
-const edge = spawn(browser, [
-  "--headless=new", "--disable-gpu", `--remote-debugging-port=${port}`,
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), "e2e-"))}`, "--window-size=1280,900", "about:blank",
-], { stdio: "ignore" });
+const edge = spawn(
+  browser,
+  [
+    "--headless=new",
+    "--disable-gpu",
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${mkdtempSync(join(tmpdir(), "e2e-"))}`,
+    "--window-size=1280,900",
+    "about:blank",
+  ],
+  { stdio: "ignore" },
+);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let ws, id = 0; const pending = new Map(); const problems = [];
-const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
+let ws,
+  id = 0;
+const pending = new Map();
+const problems = [];
+const send = (method, params = {}) =>
+  new Promise((r) => {
+    const i = ++id;
+    pending.set(i, r);
+    ws.send(JSON.stringify({ id: i, method, params }));
+  });
 const evaluate = async (expr) => {
-  const r = await send("Runtime.evaluate", { expression: `(async () => { ${HELPERS}; ${expr} })()`, awaitPromise: true, returnByValue: true });
+  const r = await send("Runtime.evaluate", {
+    expression: `(async () => { ${HELPERS}; ${expr} })()`,
+    awaitPromise: true,
+    returnByValue: true,
+  });
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? JSON.stringify(r.exceptionDetails));
   return r.result.value;
 };
@@ -82,28 +102,55 @@ const HELPERS = `
   const rowButton = (label) => { const b = [...document.querySelectorAll("table button")].find((x) => norm(x.textContent) === label); if (!b) throw new Error("no row button: " + label); b.click(); };
   const waitFor = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { try { const v = fn(); if (v) return v; } catch {} await new Promise((r) => setTimeout(r, 100)); } throw new Error("timeout waiting for: " + fn.toString()); };
 `;
-async function go(path) { await send("Page.navigate", { url: `http://localhost:3000${path}` }); await sleep(1800); }
+async function go(path) {
+  await send("Page.navigate", { url: `http://localhost:3000${path}` });
+  await sleep(1800);
+}
 async function shot(name) {
   const s = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(join(SHOTS, `e2e-${name}.png`), Buffer.from(s.data, "base64"));
 }
 async function step(name, fn) {
-  try { const out = await fn(); console.log(`✓ ${name}${out ? `: ${out}` : ""}`); }
-  catch (e) { console.log(`✗ ${name}: ${e.message.split("\n")[0]}`); await shot("fail-" + name.replace(/\W+/g, "-")); problems.push(name); }
+  try {
+    const out = await fn();
+    console.log(`✓ ${name}${out ? `: ${out}` : ""}`);
+  } catch (e) {
+    console.log(`✗ ${name}: ${e.message.split("\n")[0]}`);
+    await shot("fail-" + name.replace(/\W+/g, "-"));
+    problems.push(name);
+  }
 }
 
 try {
   let target;
-  for (let i = 0; i < 50 && !target; i++) { await sleep(200); try { target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === "page"); } catch {} }
+  for (let i = 0; i < 50 && !target; i++) {
+    await sleep(200);
+    try {
+      target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === "page");
+    } catch {}
+  }
   ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((r) => ws.addEventListener("open", r));
   ws.addEventListener("message", (e) => {
     const m = JSON.parse(e.data);
-    if (m.id && pending.has(m.id)) { pending.get(m.id)(m.result ?? m); pending.delete(m.id); }
-    if (m.method === "Runtime.exceptionThrown") problems.push("exception: " + m.params.exceptionDetails.exception?.description?.split("\n")[0]);
-    if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") problems.push("console: " + m.params.args.map((a) => a.value ?? a.description).join(" ").slice(0, 200));
+    if (m.id && pending.has(m.id)) {
+      pending.get(m.id)(m.result ?? m);
+      pending.delete(m.id);
+    }
+    if (m.method === "Runtime.exceptionThrown")
+      problems.push("exception: " + m.params.exceptionDetails.exception?.description?.split("\n")[0]);
+    if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error")
+      problems.push(
+        "console: " +
+          m.params.args
+            .map((a) => a.value ?? a.description)
+            .join(" ")
+            .slice(0, 200),
+      );
   });
-  await send("Runtime.enable"); await send("Page.enable"); await send("DOM.enable");
+  await send("Runtime.enable");
+  await send("Page.enable");
+  await send("DOM.enable");
   const stamp = Date.now();
   const email = `e2e${stamp}@example.com`;
   const kitchen = `E2E Kitchen ${stamp}`; // unique, so searches never match an older run
@@ -111,7 +158,9 @@ try {
   // Pages load their data in the browser, so these guards run client side too.
   await step("guards while logged out", async () => {
     await go("/me/reservations");
-    await evaluate(`await waitFor(() => location.pathname === "/login" && location.search === "?next=%2Fme%2Freservations" && text().includes("Log in"))`);
+    await evaluate(
+      `await waitFor(() => location.pathname === "/login" && location.search === "?next=%2Fme%2Freservations" && text().includes("Log in"))`,
+    );
     await go("/restaurants/999999999");
     await evaluate(`await waitFor(() => text().includes("We couldn't find that page"))`);
     return "login redirect keeps ?next=, missing restaurant is a 404";
@@ -119,7 +168,9 @@ try {
 
   await step("sign up", async () => {
     await go("/signup");
-    await evaluate(`fill("Name", "Eve"); fill("Email", "${email}"); fill("Password", "password123"); click("Create account", "button[type=submit]");`);
+    await evaluate(
+      `fill("Name", "Eve"); fill("Email", "${email}"); fill("Password", "password123"); click("Create account", "button[type=submit]");`,
+    );
     await evaluate(`await waitFor(() => location.pathname === "/" && text().includes("Eve"))`);
     return email;
   });
@@ -169,7 +220,9 @@ try {
       click("12:00", "button:not([disabled])"); await waitFor(() => !byText("button", "Save changes").disabled && text().includes("3 guests"));
       click("Save changes", "button"); await waitFor(() => text().includes("Your booking is updated"));`);
     await go("/me/reservations");
-    return evaluate(`await waitFor(() => text().includes("3 guests")); return "now 3 guests (reservation " + ${JSON.stringify(reservationId)} + ")"`);
+    return evaluate(
+      `await waitFor(() => text().includes("3 guests")); return "now 3 guests (reservation " + ${JSON.stringify(reservationId)} + ")"`,
+    );
   });
 
   await step("cancel it", async () => {
@@ -207,7 +260,7 @@ try {
     await evaluate(`fill("Name", "${kitchen}"); fill("Cuisine", "Thai"); fill("Location", "Test Street"); fill("Description", "Made by the end-to-end test."); fill("Seats", "8");
       [...document.querySelectorAll('input[type=checkbox]')].forEach((c) => { if (!c.checked) c.click(); });`);
     const { root } = await send("DOM.getDocument");
-    const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: 'input[type=file]' });
+    const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: "input[type=file]" });
     await send("DOM.setFileInputFiles", { nodeId, files: [BIG_PHOTO, PHOTO] });
     await evaluate(`await waitFor(() => document.querySelectorAll('img[src^="blob:"]').length === 2); click("Create restaurant", "button");
       await waitFor(() => /^\\/restaurants\\/\\d+$/.test(location.pathname) && text().includes("${kitchen}"), 10000);`);
@@ -229,7 +282,9 @@ try {
 
   await step("owner bookings page", async () => {
     await go(`/me/restaurants/${newId}/bookings`);
-    return evaluate(`await waitFor(() => text().includes("No bookings yet for this day") || text().includes("Closed on this day")); return "empty state shown"`);
+    return evaluate(
+      `await waitFor(() => text().includes("No bookings yet for this day") || text().includes("Closed on this day")); return "empty state shown"`,
+    );
   });
 
   const adminEmail = process.env.E2E_ADMIN_EMAIL ?? "admin@example.com";
@@ -254,7 +309,9 @@ try {
       await evaluate(`await waitFor(() => byText("button", "Save changes")); fill("Seats", "14");
         click("Save changes", "button"); await waitFor(() => text().includes("Saved."), 10000);`);
       await go(`/restaurants/${newId}`);
-      return evaluate(`await waitFor(() => text().includes("14 seats") && byText("a", "Edit")); return "renamed; 14 seats saved by the admin"`);
+      return evaluate(
+        `await waitFor(() => text().includes("14 seats") && byText("a", "Edit")); return "renamed; 14 seats saved by the admin"`,
+      );
     });
 
     await step("admin: impersonate the user and switch back", async () => {
@@ -288,7 +345,8 @@ try {
     });
 
     await step("admin: banned user can't log in", async () => {
-      const res = await evaluate(`const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      const res =
+        await evaluate(`const r = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: "${email}", password: "password456" }) }); return r.status + " " + (await r.json()).error.code`);
       if (!res.startsWith("403 account_banned")) throw new Error(res);
       return res;
@@ -308,7 +366,9 @@ try {
       [...document.querySelectorAll("dialog[open] button")].find((b) => b.textContent.trim() === "Ban").click();
       await waitFor(() => tableText().includes("Banned"));`);
     await shot("admin-restaurants");
-    const hidden = await evaluate(`const r = await fetch("/api/restaurants?q=${encodeURIComponent(kitchen)}"); return (await r.json()).restaurants.some((x) => x.id === ${newId})`);
+    const hidden = await evaluate(
+      `const r = await fetch("/api/restaurants?q=${encodeURIComponent(kitchen)}"); return (await r.json()).restaurants.some((x) => x.id === ${newId})`,
+    );
     if (hidden) throw new Error("banned restaurant still in public search");
     await evaluate(`rowButton("Unban"); await waitFor(() => document.querySelector("dialog[open]"));
       [...document.querySelectorAll("dialog[open] button")].find((b) => b.textContent.trim() === "Unban").click();
@@ -343,7 +403,9 @@ try {
     const cards = `new Set([...document.querySelectorAll("main a[href^='/restaurants/']")].map((a) => a.getAttribute("href"))).size`;
     const first = await evaluate(`return await waitFor(() => ${cards})`);
     if (total <= first) return `skipped: only ${total} restaurants`;
-    const after = await evaluate(`window.scrollTo(0, document.body.scrollHeight); return await waitFor(() => ${cards} > ${first} && ${cards})`);
+    const after = await evaluate(
+      `window.scrollTo(0, document.body.scrollHeight); return await waitFor(() => ${cards} > ${first} && ${cards})`,
+    );
     return `${first} → ${after} of ${total} without clicking`;
   });
 
@@ -402,4 +464,6 @@ try {
 
   console.log(problems.length ? `\nProblems:\n${problems.join("\n")}\nScreenshots: ${SHOTS}` : "\nNo console errors or exceptions.");
   process.exitCode = problems.length ? 1 : 0;
-} finally { edge.kill(); }
+} finally {
+  edge.kill();
+}

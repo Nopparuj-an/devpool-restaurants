@@ -70,8 +70,7 @@ export const restaurants: RestaurantDetail[] = [
     review_count: 126,
     cover_url: photo(1),
     owner: { id: 1, display_name: "Somchai" },
-    description:
-      "Thai home cooking by the canal. The room is small, so book ahead for lunch. The green curry changes with the season.",
+    description: "Thai home cooking by the canal. The room is small, so book ahead for lunch. The green curry changes with the season.",
     cancel_cutoff_minutes: 30,
     max_reservation_minutes: 240,
     timezone: "Asia/Bangkok",
@@ -182,9 +181,20 @@ export const ownedRestaurant: RestaurantDetail = { ...restaurants[0], is_owner: 
 // Availability for ครัวริมคลอง, days from MOCK_NOW. Tomorrow's lunch is almost full.
 export function availability(dayOffset: number): Availability {
   const booked: Record<string, number> = {
-    "12:00": 8, "12:15": 8, "12:30": 8, "12:45": 8,
-    "13:00": 4, "13:15": 4,
-    "18:00": 2, "18:15": 2, "18:30": 2, "18:45": 2, "19:00": 6, "19:15": 6, "19:30": 10, "19:45": 10,
+    "12:00": 8,
+    "12:15": 8,
+    "12:30": 8,
+    "12:45": 8,
+    "13:00": 4,
+    "13:15": 4,
+    "18:00": 2,
+    "18:15": 2,
+    "18:30": 2,
+    "18:45": 2,
+    "19:00": 6,
+    "19:15": 6,
+    "19:30": 10,
+    "19:45": 10,
   };
   const slots: Availability["slots"] = [];
   // Day 4 is Monday 5 Oct, when ครัวริมคลอง is closed.
@@ -325,11 +335,66 @@ export const admin: Account = {
 const ago = (days: number) => bkk(-days, "10:00");
 
 export const adminUsers: AdminUser[] = [
-  { id: 12, email: "spammer@example.com", display_name: "Best Deals 4 U", is_admin: false, banned_at: ago(1), ban_reason: "Posted ads as reviews", created_at: ago(2), restaurants: 0, reviews: 14, reservations: 0 },
-  { id: 9, email: "nok@example.com", display_name: "Nok", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(5), restaurants: 0, reviews: 2, reservations: 3 },
-  { id: 7, email: "admin@example.com", display_name: "Admin", is_admin: true, banned_at: null, ban_reason: "", created_at: ago(20), restaurants: 0, reviews: 0, reservations: 0 },
-  { id: 2, email: "malee@example.com", display_name: "Malee", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(30), restaurants: 2, reviews: 0, reservations: 0 },
-  { id: 1, email: "somchai@example.com", display_name: "Somchai", is_admin: false, banned_at: null, ban_reason: "", created_at: ago(31), restaurants: 3, reviews: 0, reservations: 1 },
+  {
+    id: 12,
+    email: "spammer@example.com",
+    display_name: "Best Deals 4 U",
+    is_admin: false,
+    banned_at: ago(1),
+    ban_reason: "Posted ads as reviews",
+    created_at: ago(2),
+    restaurants: 0,
+    reviews: 14,
+    reservations: 0,
+  },
+  {
+    id: 9,
+    email: "nok@example.com",
+    display_name: "Nok",
+    is_admin: false,
+    banned_at: null,
+    ban_reason: "",
+    created_at: ago(5),
+    restaurants: 0,
+    reviews: 2,
+    reservations: 3,
+  },
+  {
+    id: 7,
+    email: "admin@example.com",
+    display_name: "Admin",
+    is_admin: true,
+    banned_at: null,
+    ban_reason: "",
+    created_at: ago(20),
+    restaurants: 0,
+    reviews: 0,
+    reservations: 0,
+  },
+  {
+    id: 2,
+    email: "malee@example.com",
+    display_name: "Malee",
+    is_admin: false,
+    banned_at: null,
+    ban_reason: "",
+    created_at: ago(30),
+    restaurants: 2,
+    reviews: 0,
+    reservations: 0,
+  },
+  {
+    id: 1,
+    email: "somchai@example.com",
+    display_name: "Somchai",
+    is_admin: false,
+    banned_at: null,
+    ban_reason: "",
+    created_at: ago(31),
+    restaurants: 3,
+    reviews: 0,
+    reservations: 1,
+  },
 ];
 
 export const adminRestaurants: AdminRestaurant[] = restaurants.map((r, i) => ({
@@ -361,8 +426,24 @@ export const profile: Profile = {
 
 export const profileReviews: ProfileReview[] = [
   { ...reviews[0], restaurant: ref(restaurants[0]) },
-  { id: 11, rating: 4, body: "Crispy pork was great. The rice ran out by 8.", verified: false, created_at: ago(20), updated_at: ago(20), restaurant: ref(restaurants[1]) },
-  { id: 12, rating: 3, body: "Nice view, slow service.", verified: true, created_at: ago(40), updated_at: ago(40), restaurant: ref(restaurants[2]) },
+  {
+    id: 11,
+    rating: 4,
+    body: "Crispy pork was great. The rice ran out by 8.",
+    verified: false,
+    created_at: ago(20),
+    updated_at: ago(20),
+    restaurant: ref(restaurants[1]),
+  },
+  {
+    id: 12,
+    rating: 3,
+    body: "Nice view, slow service.",
+    verified: true,
+    created_at: ago(40),
+    updated_at: ago(40),
+    restaurant: ref(restaurants[2]),
+  },
 ];
 
 export const ownerProfile: Profile = {

@@ -88,8 +88,7 @@ export function RestaurantForm({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
 
-  const setRow = (d: number, patch: Partial<DayRow>) =>
-    setRows((rs) => rs.map((r, i) => (i === d ? { ...r, ...patch } : r)));
+  const setRow = (d: number, patch: Partial<DayRow>) => setRows((rs) => rs.map((r, i) => (i === d ? { ...r, ...patch } : r)));
 
   async function save() {
     const hours = rows.flatMap((r, weekday) => (r.open ? [{ weekday, open: r.from, close: r.to }] : []));
@@ -128,8 +127,7 @@ export function RestaurantForm({
     });
   }
 
-  const hintFor = (r: DayRow) =>
-    !r.open ? null : r.from === r.to ? "Open 24 hours" : r.to < r.from ? "Closes the next day" : null;
+  const hintFor = (r: DayRow) => (!r.open ? null : r.from === r.to ? "Open 24 hours" : r.to < r.from ? "Closes the next day" : null);
 
   return (
     <div className="flex flex-col">
@@ -150,7 +148,10 @@ export function RestaurantForm({
         </Field>
       </Section>
 
-      <Section title="Photos" hint="The first photo is the cover. Up to 10 JPEG, PNG or WebP photos. Large photos are resized before upload.">
+      <Section
+        title="Photos"
+        hint="The first photo is the cover. Up to 10 JPEG, PNG or WebP photos. Large photos are resized before upload."
+      >
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {images.map((img, i) => (
             <div key={img.key} className="group relative">
@@ -250,13 +251,23 @@ export function RestaurantForm({
                 </label>
                 {r.open ? (
                   <div className="flex items-center gap-2">
-                    <Select className="w-24" value={r.from} onChange={(e) => setRow(d, { from: e.target.value })} aria-label={`${WEEKDAYS[d]} opens`}>
+                    <Select
+                      className="w-24"
+                      value={r.from}
+                      onChange={(e) => setRow(d, { from: e.target.value })}
+                      aria-label={`${WEEKDAYS[d]} opens`}
+                    >
                       {TIMES.map((t) => (
                         <option key={t}>{t}</option>
                       ))}
                     </Select>
                     <span className="text-sm text-muted">to</span>
-                    <Select className="w-24" value={r.to} onChange={(e) => setRow(d, { to: e.target.value })} aria-label={`${WEEKDAYS[d]} closes`}>
+                    <Select
+                      className="w-24"
+                      value={r.to}
+                      onChange={(e) => setRow(d, { to: e.target.value })}
+                      aria-label={`${WEEKDAYS[d]} closes`}
+                    >
                       {TIMES.map((t) => (
                         <option key={t}>{t}</option>
                       ))}
@@ -298,8 +309,8 @@ export function RestaurantForm({
         >
           {initial.upcoming_reservations ? (
             <>
-              This also deletes <span className="font-medium text-ink">{initial.upcoming_reservations} upcoming bookings</span> and
-              every review. You can&apos;t undo this.
+              This also deletes <span className="font-medium text-ink">{initial.upcoming_reservations} upcoming bookings</span> and every
+              review. You can&apos;t undo this.
             </>
           ) : (
             <>This deletes the restaurant and its reviews. You can&apos;t undo this.</>

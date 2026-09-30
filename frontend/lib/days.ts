@@ -53,9 +53,7 @@ export function upcomingDays(now: Date, timeZone: string, count: number): { key:
         ? "Today"
         : i === 1
           ? "Tomorrow"
-          : new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", timeZone: "UTC" }).format(
-              new Date(`${key}T12:00:00Z`),
-            );
+          : new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${key}T12:00:00Z`));
     return { key, label };
   });
 }

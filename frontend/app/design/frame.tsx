@@ -19,16 +19,8 @@ export function Frame({ src, width, height, label }: { src: string; width: numbe
   return (
     <figure className="flex flex-col gap-2">
       <div ref={box} className="w-full">
-        <div
-          className="overflow-hidden rounded-xl border border-line bg-white"
-          style={{ width: width * scale, height: height * scale }}
-        >
-          <iframe
-            src={src}
-            title={label}
-            loading="lazy"
-            style={{ width, height, transform: `scale(${scale})`, transformOrigin: "0 0" }}
-          />
+        <div className="overflow-hidden rounded-xl border border-line bg-white" style={{ width: width * scale, height: height * scale }}>
+          <iframe src={src} title={label} loading="lazy" style={{ width, height, transform: `scale(${scale})`, transformOrigin: "0 0" }} />
         </div>
       </div>
       <figcaption className="flex items-center justify-between text-xs text-muted">

@@ -33,11 +33,7 @@ export function Field({
     <label className={`flex flex-col gap-1.5 ${className}`}>
       <span className="text-sm font-medium">{label}</span>
       {children}
-      {error ? (
-        <span className="text-sm text-danger">{error}</span>
-      ) : hint ? (
-        <span className="text-sm text-muted">{hint}</span>
-      ) : null}
+      {error ? <span className="text-sm text-danger">{error}</span> : hint ? <span className="text-sm text-muted">{hint}</span> : null}
     </label>
   );
 }

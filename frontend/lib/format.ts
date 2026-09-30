@@ -25,9 +25,7 @@ export function time(iso: string, timeZone: string): string {
 }
 
 export function day(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone }).format(
-    new Date(iso),
-  );
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone }).format(new Date(iso));
 }
 
 export function timeRange(start: string, end: string, timeZone: string): string {

@@ -69,13 +69,7 @@ export function ProfileForm({ account, onSave }: { account: Account; onSave: (na
 }
 
 // Change the password, or set one for accounts that only use Google (ADR-0002).
-export function PasswordForm({
-  hasPassword,
-  onSave,
-}: {
-  hasPassword: boolean;
-  onSave: (next: string) => Save;
-}) {
+export function PasswordForm({ hasPassword, onSave }: { hasPassword: boolean; onSave: (next: string) => Save }) {
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<Message>(null);
@@ -100,10 +94,24 @@ export function PasswordForm({
     >
       <form onSubmit={save} className="flex flex-col gap-4">
         <Field label="New password">
-          <Input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" minLength={8} required />
+          <Input
+            type="password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
         </Field>
         <Field label="Repeat new password">
-          <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" minLength={8} required />
+          <Input
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            autoComplete="new-password"
+            minLength={8}
+            required
+          />
         </Field>
         <div className="flex items-center gap-3">
           <Button type="submit" disabled={busy}>

@@ -38,8 +38,9 @@ test: ## Run backend tests (integration tests use throwaway DBs on the compose P
 	  TEST_IMAGE_PUBLIC_URL=http://$$S3_BUCKET.web.garage.localhost:3902 \
 	  go test ./...
 
-fmt: ## gofmt backend
+fmt: ## gofmt backend, prettier frontend
 	cd backend && gofmt -w .
+	cd frontend && pnpm format
 
 vet: ## go vet backend
 	cd backend && go vet ./...

@@ -242,9 +242,7 @@ const screens = {
     render: () => <MyBookingsScreen account={mock.impersonated} reservations={mock.myReservations} onCancel={done} onChange={() => {}} />,
   },
   "admin-user": {
-    render: () => (
-      <AdminUserScreen account={mock.admin} user={mock.adminUserDetail} onBan={done} onRename={ok} onImpersonate={ok} />
-    ),
+    render: () => <AdminUserScreen account={mock.admin} user={mock.adminUserDetail} onBan={done} onRename={ok} onImpersonate={ok} />,
   },
   "admin-restaurants": { render: () => <AdminRestaurants /> },
   "restaurant-hidden": {

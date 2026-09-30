@@ -54,7 +54,13 @@ export function Stepper({
     "flex size-10 items-center justify-center text-ink transition-colors hover:bg-surface disabled:text-faint disabled:hover:bg-transparent";
   return (
     <div className="inline-flex h-10 items-center rounded-lg border border-line" role="group" aria-label={label}>
-      <button type="button" className={`${btn} rounded-l-lg`} onClick={() => onChange(value - 1)} disabled={value <= min} aria-label="Fewer">
+      <button
+        type="button"
+        className={`${btn} rounded-l-lg`}
+        onClick={() => onChange(value - 1)}
+        disabled={value <= min}
+        aria-label="Fewer"
+      >
         <Minus className="size-4" />
       </button>
       <span className="w-10 text-center text-sm font-medium tabular-nums" aria-live="polite">
@@ -80,7 +86,9 @@ export function RatingInput({ value, onChange }: { value: number; onChange: (val
           onClick={() => onChange(n)}
           className="rounded p-0.5"
         >
-          <Star className={`size-6 transition-colors ${n <= value ? "fill-accent text-accent" : "fill-white text-line hover:text-accent/50"}`} />
+          <Star
+            className={`size-6 transition-colors ${n <= value ? "fill-accent text-accent" : "fill-white text-line hover:text-accent/50"}`}
+          />
         </button>
       ))}
     </div>
@@ -113,11 +121,7 @@ export function ConfirmDialog({
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-xl p-0 backdrop:bg-ink/30"
-    >
+    <dialog ref={ref} onClose={onClose} className="m-auto w-[min(28rem,calc(100%-2rem))] rounded-xl p-0 backdrop:bg-ink/30">
       <div className="flex flex-col gap-3 p-6">
         <h2 className="text-lg font-semibold">{title}</h2>
         <div className="text-sm text-muted">{children}</div>

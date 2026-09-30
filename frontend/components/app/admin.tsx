@@ -361,7 +361,11 @@ export function UserTable({
               <td className="px-4 py-3 text-muted">{fmt.day(u.created_at, tz)}</td>
               <td className="px-4 py-3">
                 <StatusBadge bannedAt={u.banned_at} admin={u.is_admin} />
-                {u.ban_reason && <div className="mt-1 max-w-48 truncate text-xs text-muted" title={u.ban_reason}>{u.ban_reason}</div>}
+                {u.ban_reason && (
+                  <div className="mt-1 max-w-48 truncate text-xs text-muted" title={u.ban_reason}>
+                    {u.ban_reason}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3 text-right">
                 {!u.is_admin && (
@@ -443,7 +447,11 @@ export function RestaurantTable({
               </td>
               <td className="px-4 py-3">
                 <StatusBadge bannedAt={r.banned_at} />
-                {r.ban_reason && <div className="mt-1 max-w-48 truncate text-xs text-muted" title={r.ban_reason}>{r.ban_reason}</div>}
+                {r.ban_reason && (
+                  <div className="mt-1 max-w-48 truncate text-xs text-muted" title={r.ban_reason}>
+                    {r.ban_reason}
+                  </div>
+                )}
               </td>
               <td className="px-4 py-3 text-right">
                 <Button
