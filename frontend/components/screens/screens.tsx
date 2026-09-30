@@ -268,6 +268,7 @@ export function RestaurantScreen({
                 onSubmit={onBook}
                 editing={editing}
                 initialDay={initialDay}
+                locked={!account}
               />
             </aside>
 

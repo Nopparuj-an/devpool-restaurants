@@ -2,6 +2,7 @@
 
 import { BadgeCheck, Star } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -109,13 +110,22 @@ export function ReviewForm({
   onSave: (input: { rating: number; body: string }) => Promise<{ error?: string }>;
   onDelete: () => Promise<void>;
 }) {
+  const here = usePathname();
   const [rating, setRating] = useState(existing?.rating ?? 0);
   const [body, setBody] = useState(existing?.body ?? "");
   const [editing, setEditing] = useState(!existing);
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
 
   if (mode === "owner") return <Notice>You can&apos;t review your own restaurant.</Notice>;
-  if (mode === "anonymous") return <Notice>Log in to write a review.</Notice>;
+  if (mode === "anonymous")
+    return (
+      <Notice>
+        <Link href={`/login?next=${encodeURIComponent(here)}`} className="font-medium text-accent hover:text-accent-hover">
+          Log in
+        </Link>{" "}
+        to write a review.
+      </Notice>
+    );
 
   if (!editing && existing) {
     return (
