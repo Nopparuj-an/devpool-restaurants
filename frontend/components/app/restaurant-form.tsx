@@ -64,11 +64,14 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
 export function RestaurantForm({
   initial,
   images: initialImages = [],
+  saved = false,
   onSave,
   onDelete,
 }: {
   initial?: RestaurantDetail;
   images?: RestaurantImage[];
+  // The parent remounts the form after a save; this restores the notice.
+  saved?: boolean;
   onSave: (input: RestaurantInput, photos: PhotoItem[]) => Promise<{ error?: string }>;
   onDelete?: () => Promise<void>;
 }) {
@@ -86,7 +89,9 @@ export function RestaurantForm({
   const [saving, setSaving] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(
+    saved ? { tone: "success", text: "Saved." } : null,
+  );
 
   const setRow = (d: number, patch: Partial<DayRow>) => setRows((rs) => rs.map((r, i) => (i === d ? { ...r, ...patch } : r)));
 

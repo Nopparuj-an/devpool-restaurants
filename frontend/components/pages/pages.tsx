@@ -403,6 +403,8 @@ function RestaurantEditor({ account, restaurant }: { account: Account; restauran
   const router = useRouter();
   const client = useQueryClient();
   const refresh = useRefresh();
+  // Lives outside the form so "Saved." survives the remount below.
+  const [saved, setSaved] = useState(false);
 
   async function create(input: RestaurantInput, photos: PhotoItem[]) {
     const form = new FormData();
@@ -423,6 +425,7 @@ function RestaurantEditor({ account, restaurant }: { account: Account; restauran
   // Details first, then photos: add new ones before removing old ones so the
   // restaurant never drops to zero images (R-REST-1), then set the cover.
   async function update(r: RestaurantDetail, input: RestaurantInput, photos: PhotoItem[]) {
+    setSaved(false);
     const details = await api("PUT", `/restaurants/${r.id}`, input);
     if (details.error) return { error: details.error };
 
@@ -448,6 +451,7 @@ function RestaurantEditor({ account, restaurant }: { account: Account; restauran
       const res = await api("PUT", `/restaurants/${r.id}/images/${coverId}/cover`);
       if (res.error) return { error: res.error };
     }
+    setSaved(true);
     await refresh();
     return {};
   }
@@ -458,6 +462,7 @@ function RestaurantEditor({ account, restaurant }: { account: Account; restauran
       key={restaurant?.images.map((i) => i.id).join(",")}
       account={account}
       restaurant={restaurant}
+      saved={saved}
       onSave={(input, photos) => (restaurant ? update(restaurant, input, photos) : create(input, photos))}
       onDelete={
         restaurant

@@ -457,11 +457,13 @@ export function MyRestaurantsScreen({ account, restaurants }: { account: Account
 export function RestaurantEditorScreen({
   account,
   restaurant,
+  saved,
   onSave,
   onDelete,
 }: {
   account: Account;
   restaurant?: RestaurantDetail;
+  saved?: boolean;
   onSave: (input: RestaurantInput, photos: PhotoItem[]) => Result;
   onDelete?: () => Promise<void>;
 }) {
@@ -470,7 +472,7 @@ export function RestaurantEditorScreen({
       <SiteHeader account={account} current="/me/restaurants" />
       <Page>
         <PageTitle title={restaurant ? `Edit ${restaurant.name}` : "Add a restaurant"} />
-        <RestaurantForm initial={restaurant} images={restaurant?.images} onSave={onSave} onDelete={onDelete} />
+        <RestaurantForm initial={restaurant} images={restaurant?.images} saved={saved} onSave={onSave} onDelete={onDelete} />
       </Page>
     </>
   );
