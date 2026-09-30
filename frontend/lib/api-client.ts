@@ -61,7 +61,9 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   if (res.status === 204) return { status: 204 };
   const json = await res.json().catch(() => null);
   if (!res.ok) {
-    if (res.status === 401) return { status: 401, error: "Your session has ended. Log in again." };
+    const code = json?.error?.code;
+    if (code === "session_expired") return { status: 401, error: "Your session has ended. Log in again." };
+    if (code === "unauthorized") return { status: 401, error: "You need to log in first." };
     return { status: res.status, error: sentence(json?.error?.message ?? "") };
   }
   return { status: res.status, data: json as T };
