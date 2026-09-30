@@ -1,6 +1,8 @@
 # Design system
 
-Live gallery: **http://localhost:3000/design** (with `pnpm dev` running). Each screen can also be opened on its own at `/design/screens/<name>`. See [ADR-0008](decisions/0008-design-as-react-components.md) for why the design lives in code.
+Live gallery: **http://localhost:3000/design** (with `pnpm dev` running). Each screen can also be opened on its own at `/design/screens/<name>`. See [ADR-0008](decisions/0008-design-as-react-components.md) for why the design lives in code. The gallery has a left sidebar (Foundations, Components, Screens) that follows your scroll; on phones it collapses into a bar at the top. New specimens need an entry in `app/design/screen-list.ts` matching their `id` in `gallery.tsx`.
+
+The app's top bar (`SiteHeader`) is sticky, including the impersonation banner. Anything else sticky under it, like the booking panel, must offset by the header height (`lg:top-20`).
 
 ## Look
 

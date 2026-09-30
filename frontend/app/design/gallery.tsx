@@ -36,16 +36,16 @@ const STATUS = [
 
 export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-20 border-t border-line py-12">
+    <section id={id} className="scroll-mt-6 border-t border-line py-12">
       <h2 className="mb-8 text-xl font-semibold tracking-tight">{title}</h2>
       {children}
     </section>
   );
 }
 
-function Specimen({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) {
+function Specimen({ id, label, children, wide }: { id: string; label: string; children: ReactNode; wide?: boolean }) {
   return (
-    <div className={`flex flex-col gap-3 ${wide ? "md:col-span-2" : ""}`}>
+    <div id={id} className={`scroll-mt-6 flex flex-col gap-3 ${wide ? "md:col-span-2" : ""}`}>
       <p className="text-xs font-medium uppercase tracking-wide text-faint">{label}</p>
       <div className="flex flex-wrap items-start gap-3">{children}</div>
     </div>
@@ -56,7 +56,7 @@ export function Foundations() {
   return (
     <Section id="foundations" title="Foundations">
       <div className="grid gap-10">
-        <Specimen label="Colors">
+        <Specimen id="colors" label="Colors">
           <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4">
             {COLORS.map((c) => (
               <div key={c.name} className="flex flex-col gap-2">
@@ -70,7 +70,7 @@ export function Foundations() {
             ))}
           </div>
         </Specimen>
-        <Specimen label="Status">
+        <Specimen id="status" label="Status">
           {STATUS.map((c) => (
             <div key={c.name} className="flex items-center gap-2 text-sm">
               <span className="size-4 rounded-full" style={{ background: c.hex }} />
@@ -78,7 +78,7 @@ export function Foundations() {
             </div>
           ))}
         </Specimen>
-        <Specimen label="Type, Anuphan">
+        <Specimen id="type" label="Type, Anuphan">
           <div className="flex flex-col gap-3">
             <p className="text-3xl font-semibold tracking-tight">ครัวริมคลอง, 30 / semibold</p>
             <p className="text-2xl font-semibold tracking-tight">Page title, 24 / semibold</p>
@@ -105,7 +105,7 @@ export function Components() {
   return (
     <Section id="components" title="Components">
       <div className="grid gap-12 md:grid-cols-2">
-        <Specimen label="Buttons">
+        <Specimen id="buttons" label="Buttons">
           <Button>Book table</Button>
           <Button variant="secondary">Change</Button>
           <Button variant="ghost">Cancel</Button>
@@ -114,7 +114,7 @@ export function Components() {
           <Button disabled>Disabled</Button>
         </Specimen>
 
-        <Specimen label="Badges">
+        <Specimen id="badges" label="Badges">
           <Badge tone="accent">Upcoming</Badge>
           <Badge tone="warning">Limited seats left</Badge>
           <Badge tone="success">Now</Badge>
@@ -122,7 +122,7 @@ export function Components() {
           <Badge tone="danger">Error</Badge>
         </Specimen>
 
-        <Specimen label="Fields">
+        <Specimen id="fields" label="Fields">
           <div className="grid w-full gap-4">
             <Field label="Email">
               <Input placeholder="you@example.com" />
@@ -143,7 +143,7 @@ export function Components() {
         </Specimen>
 
         <div className="flex flex-col gap-10">
-          <Specimen label="Segmented">
+          <Specimen id="segmented" label="Segmented">
             <Segmented
               label="Sort"
               value={seg}
@@ -155,24 +155,24 @@ export function Components() {
               ]}
             />
           </Specimen>
-          <Specimen label="Stepper">
+          <Specimen id="stepper" label="Stepper">
             <Stepper value={pax} onChange={setPax} min={1} max={10} label="Guests" />
           </Specimen>
-          <Specimen label="Rating">
+          <Specimen id="rating" label="Rating">
             <Rating value={4.7} count={126} />
             <Rating value={4.7} count={126} size="lg" />
             <Rating value={null} count={0} />
             <Stars value={4} />
             <RatingInput value={stars} onChange={setStars} />
           </Specimen>
-          <Specimen label="Notices">
+          <Specimen id="notices" label="Notices">
             <div className="flex w-full flex-col gap-2">
               <Notice>You can&apos;t review your own restaurant.</Notice>
               <Notice tone="success">You&apos;re booked. See it under My bookings.</Notice>
               <Notice tone="danger">Only 2 seats left in that time range.</Notice>
             </div>
           </Specimen>
-          <Specimen label="Dialog">
+          <Specimen id="dialog" label="Dialog">
             <Button variant="secondary" onClick={() => setDialog(true)}>
               Open confirm dialog
             </Button>
@@ -189,13 +189,13 @@ export function Components() {
           </Specimen>
         </div>
 
-        <Specimen label="Empty state" wide>
+        <Specimen id="empty-state" label="Empty state" wide>
           <div className="w-full">
             <EmptyState title="No upcoming bookings" action={<Button>Find a table</Button>} />
           </div>
         </Specimen>
 
-        <Specimen label="Restaurant card">
+        <Specimen id="restaurant-card" label="Restaurant card">
           <div className="w-72">
             <RestaurantCard restaurant={mock.summaries[0]} limited />
           </div>
@@ -204,12 +204,12 @@ export function Components() {
           </div>
         </Specimen>
 
-        <Specimen label="Opening hours">
+        <Specimen id="opening-hours" label="Opening hours">
           <HoursList hours={mock.restaurants[0].hours} />
           <HoursList hours={mock.restaurants[3].hours} />
         </Specimen>
 
-        <Specimen label="Reservation card" wide>
+        <Specimen id="reservation-card" label="Reservation card" wide>
           <div className="grid w-full gap-3 md:grid-cols-2">
             {mock.myReservations.map((r) => (
               <ReservationCard key={r.id} reservation={r} onCancel={() => {}} onChange={() => {}} />
@@ -217,7 +217,7 @@ export function Components() {
           </div>
         </Specimen>
 
-        <Specimen label="Booking panel">
+        <Specimen id="booking-panel" label="Booking panel">
           <div className="w-full max-w-sm">
             <BookingPanel
               seats={10}
@@ -232,7 +232,7 @@ export function Components() {
         </Specimen>
 
         <div className="flex flex-col gap-10">
-          <Specimen label="Review">
+          <Specimen id="review" label="Review">
             <div className="w-full">
               {mock.reviews.slice(0, 2).map((r) => (
                 <ReviewItem key={r.id} review={r} />
@@ -240,19 +240,19 @@ export function Components() {
               <ReviewItem review={{ ...mock.reviews[2], author: { ...mock.reviews[2].author, email: "carol@example.com" } }} />
             </div>
           </Specimen>
-          <Specimen label="Review form">
+          <Specimen id="review-form" label="Review form">
             <div className="w-full">
               <ReviewForm mode="customer" onSave={ok} onDelete={async () => {}} />
             </div>
           </Specimen>
-          <Specimen label="Login">
+          <Specimen id="login" label="Login">
             <div className="w-full max-w-sm rounded-xl border border-line p-6">
               <AuthForm mode="login" googleEnabled onSubmit={ok} />
             </div>
           </Specimen>
         </div>
 
-        <Specimen label="Owner: load chart and bookings table" wide>
+        <Specimen id="owner-tools" label="Owner: load chart and bookings table" wide>
           <div className="flex w-full flex-col gap-6">
             <LoadStrip reservations={mock.ownerReservations} seats={10} from={mock.bkk(1, "11:00")} to={mock.bkk(1, "22:00")} />
             <OwnerTable reservations={mock.ownerReservations} />

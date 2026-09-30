@@ -257,7 +257,7 @@ export function RestaurantScreen({
               <p className="mt-3 max-w-prose leading-relaxed">{r.description}</p>
             </div>
 
-            <aside className="min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+            <aside className="min-w-0 lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
               <BookingPanel
                 seats={r.seats}
                 maxMinutes={r.max_reservation_minutes}

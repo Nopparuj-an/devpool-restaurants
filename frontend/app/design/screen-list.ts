@@ -29,3 +29,30 @@ export const SCREENS = [
 export type ScreenName = (typeof SCREENS)[number]["name"];
 
 export const isScreen = (s: string): s is ScreenName => SCREENS.some((x) => x.name === s);
+
+// Sidebar of /design: group, then [anchor id, label]. Anchors match the ids in gallery.tsx.
+export const FOUNDATIONS = [
+  ["colors", "Colors"],
+  ["status", "Status"],
+  ["type", "Type"],
+] as const;
+
+export const COMPONENTS = [
+  ["buttons", "Buttons"],
+  ["badges", "Badges"],
+  ["fields", "Fields"],
+  ["segmented", "Segmented"],
+  ["stepper", "Stepper"],
+  ["rating", "Rating"],
+  ["notices", "Notices"],
+  ["dialog", "Dialog"],
+  ["empty-state", "Empty state"],
+  ["restaurant-card", "Restaurant card"],
+  ["opening-hours", "Opening hours"],
+  ["reservation-card", "Reservation card"],
+  ["booking-panel", "Booking panel"],
+  ["review", "Review"],
+  ["review-form", "Review form"],
+  ["login", "Login"],
+  ["owner-tools", "Owner tools"],
+] as const;
