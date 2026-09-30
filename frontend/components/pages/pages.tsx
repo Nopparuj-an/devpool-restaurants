@@ -547,9 +547,8 @@ export function AccountRoute() {
         if (!res.error) await refresh(); // header shows the new name
         return { error: res.error };
       }}
-      onSetPassword={async (current_password, new_password) => {
-        const res = await api("PUT", "/me/password", { current_password, new_password });
-        if (res.status === 401) return { error: "Your current password is wrong." };
+      onSetPassword={async (new_password) => {
+        const res = await api("PUT", "/me/password", { new_password });
         if (!res.error) await refresh(); // has_password may have changed
         return { error: res.error };
       }}

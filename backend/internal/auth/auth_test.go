@@ -49,9 +49,9 @@ func TestChangePassword(t *testing.T) {
 	env := apitest.New(t)
 	carol := env.Signup("carol@example.com", "Carol")
 
-	carol.Do("PUT", "/api/me/password", map[string]string{"current_password": "nope-nope", "new_password": "new-password"}).
-		ExpectError(http.StatusUnauthorized, "invalid_credentials")
-	carol.Do("PUT", "/api/me/password", map[string]string{"current_password": "password123", "new_password": "new-password"}).
+	carol.Do("PUT", "/api/me/password", map[string]string{"new_password": "short"}).
+		ExpectError(http.StatusUnprocessableEntity, "invalid_input")
+	carol.Do("PUT", "/api/me/password", map[string]string{"new_password": "new-password"}).
 		Expect(http.StatusNoContent)
 
 	env.Client().Do("POST", "/api/auth/login", map[string]string{"email": "carol@example.com", "password": "new-password"}).
@@ -62,7 +62,7 @@ func TestForgedCookieIsAnonymous(t *testing.T) {
 	env := apitest.New(t)
 	req, _ := http.NewRequest("GET", "/api/me", nil)
 	req.AddCookie(&http.Cookie{Name: "session", Value: "forged"})
-	env.Client().Send(req).ExpectError(http.StatusUnauthorized, "unauthorized")
+	env.Client().Send(req).ExpectError(http.StatusUnauthorized, "session_expired")
 }
 
 func TestUpdateProfile(t *testing.T) {

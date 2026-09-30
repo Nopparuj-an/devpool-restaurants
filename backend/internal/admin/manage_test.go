@@ -59,7 +59,7 @@ func TestImpersonation(t *testing.T) {
 		t.Fatal("restaurant created while impersonating should belong to the user")
 	}
 	admin.Do("GET", "/api/admin/users", nil).ExpectError(http.StatusForbidden, "admin_only")
-	admin.Do("PUT", "/api/me/password", map[string]string{"current_password": "x", "new_password": "password999"}).
+	admin.Do("PUT", "/api/me/password", map[string]string{"new_password": "password999"}).
 		ExpectError(http.StatusForbidden, "R-ADMIN-7")
 	// The user's own session is untouched.
 	if me(t, user).Impersonator != nil {

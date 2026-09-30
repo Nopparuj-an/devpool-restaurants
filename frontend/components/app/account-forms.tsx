@@ -74,9 +74,8 @@ export function PasswordForm({
   onSave,
 }: {
   hasPassword: boolean;
-  onSave: (current: string, next: string) => Save;
+  onSave: (next: string) => Save;
 }) {
-  const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState<Message>(null);
@@ -86,10 +85,9 @@ export function PasswordForm({
     e.preventDefault();
     if (next !== confirm) return setMessage({ tone: "danger", text: "The new passwords don't match." });
     setBusy(true);
-    const res = await onSave(current, next);
+    const res = await onSave(next);
     setBusy(false);
     if (res.error) return setMessage({ tone: "danger", text: res.error });
-    setCurrent("");
     setNext("");
     setConfirm("");
     setMessage({ tone: "success", text: hasPassword ? "Password changed." : "Password set. You can now log in with email too." });
@@ -101,11 +99,6 @@ export function PasswordForm({
       hint={hasPassword ? "Use at least 8 characters." : "You log in with Google. Add a password to also log in with your email."}
     >
       <form onSubmit={save} className="flex flex-col gap-4">
-        {hasPassword && (
-          <Field label="Current password">
-            <Input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
-          </Field>
-        )}
         <Field label="New password">
           <Input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" minLength={8} required />
         </Field>

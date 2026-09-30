@@ -46,7 +46,7 @@ func TestDeleteUsers(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("deleted = %d, want 1", n)
 	}
-	alice.Do("GET", "/api/me", nil).ExpectError(http.StatusUnauthorized, "unauthorized")
+	alice.Do("GET", "/api/me", nil).ExpectError(http.StatusUnauthorized, "session_expired")
 	env.Client().Do("GET", fmt.Sprintf("/api/restaurants/%d", alicePlace), nil).ExpectError(http.StatusNotFound, "not_found")
 	if s := rating(t, carol, bobPlace); *s.Rating != 3 || s.ReviewCount != 1 {
 		t.Fatalf("Bob's rating should drop Alice's 5★: %+v", s)

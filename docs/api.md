@@ -5,6 +5,8 @@ Base path `/api`. JSON in and out, UTC ISO-8601 timestamps (R-TIME-1). Errors lo
 The tests in `backend/internal/*/…_test.go` are the executable spec for these endpoints.
 
 ## Auth
+Every 🔒 route answers `401` with a code that says why: `unauthorized` (no session cookie: not logged in), `session_expired` (a cookie was sent but it no longer works: expired, logged out elsewhere, or the account was banned; the server clears it). Wrong login details are `401 invalid_credentials` on `/auth/login`.
+
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | POST | `/auth/signup` | `{email, password, display_name}` | `201` Account + session cookie. `409 email_taken` |
@@ -15,7 +17,7 @@ The tests in `backend/internal/*/…_test.go` are the executable spec for these 
 | GET | `/auth/providers` | – | `{password: true, google: bool}`. Hide the Google button when it's false |
 | GET | `/auth/google/start?next=/path` | – | `302` to Google. Use as a plain link, not fetch |
 | GET | `/auth/google/callback` | (from Google) | `302` to `next` with a session, or to `/login?error=<code>` |
-| PUT 🔒 | `/me/password` | `{current_password, new_password}` (current is ignored if the account has no password yet) | `204`. `403 R-ADMIN-7` while impersonating |
+| PUT 🔒 | `/me/password` | `{new_password}` (the session is the proof; no current password) | `204`. `403 R-ADMIN-7` while impersonating |
 | POST 🔒 | `/auth/impersonate/stop` | – | Admin's Account + a new admin session cookie. `409 not_impersonating` otherwise |
 
 ## Restaurants

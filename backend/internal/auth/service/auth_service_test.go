@@ -65,7 +65,7 @@ func TestLoginWithGoogle(t *testing.T) {
 		}
 
 		// The victim can now set their own password, which is trusted.
-		if err := svc.SetPassword(ctx, victim.ID, "", "victims-own-pw"); err != nil {
+		if err := svc.SetPassword(ctx, victim.ID, "victims-own-pw"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := svc.Login(ctx, "victim@example.com", "victims-own-pw"); err != nil {

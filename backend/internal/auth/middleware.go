@@ -15,6 +15,7 @@ import (
 const cookieName = "session"
 
 type ctxKey struct{}
+type staleKey struct{}
 
 // Session loads the account behind the session cookie, if any, for every
 // request. A stale or unknown cookie is cleared and the request continues
@@ -30,6 +31,7 @@ func (h *Handler) Session() gin.HandlerFunc {
 		switch {
 		case errors.Is(err, model.ErrNoSession):
 			h.clearCookie(c)
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), staleKey{}, true))
 		case err != nil:
 			slog.Error("load session", "err", err)
 		default:
@@ -39,10 +41,17 @@ func (h *Handler) Session() gin.HandlerFunc {
 	}
 }
 
-// RequireLogin stops the request with 401 unless a session is loaded.
+// RequireLogin stops the request with 401 unless a session is loaded. The code
+// says why: session_expired when the request carried a cookie that no longer
+// works (expired, ended, or the account was banned), unauthorized when it
+// carried none.
 func RequireLogin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if _, ok := CurrentAccount(c); !ok {
+			if stale, _ := c.Request.Context().Value(staleKey{}).(bool); stale {
+				web.Error(c, model.ErrSessionExpired)
+				return
+			}
 			web.Error(c, apperr.ErrUnauthorized)
 			return
 		}

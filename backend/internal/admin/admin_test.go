@@ -130,7 +130,7 @@ func TestBanUser(t *testing.T) {
 
 	admin.Do("POST", fmt.Sprintf("/api/admin/users/%d/ban", aliceID.ID), map[string]string{"reason": "spam"}).Expect(http.StatusOK)
 
-	alice.Do("GET", "/api/me", nil).ExpectError(http.StatusUnauthorized, "unauthorized") // session ended
+	alice.Do("GET", "/api/me", nil).ExpectError(http.StatusUnauthorized, "session_expired") // session ended
 	env.Client().Do("POST", "/api/auth/login", map[string]string{"email": "alice@example.com", "password": "password123"}).
 		ExpectError(http.StatusForbidden, "account_banned")
 	anon.Do("GET", fmt.Sprintf("/api/restaurants/%d", alicePlace), nil).ExpectError(http.StatusNotFound, "not_found")

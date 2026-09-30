@@ -56,7 +56,7 @@ type TxRunner interface {
 type Service interface {
 	Signup(ctx context.Context, email, password, displayName string) (model.Account, error)
 	Login(ctx context.Context, email, password string) (model.Account, error)
-	SetPassword(ctx context.Context, accountID int64, current, next string) error
+	SetPassword(ctx context.Context, accountID int64, next string) error
 	UpdateProfile(ctx context.Context, accountID int64, displayName string) (model.Account, error)
 	LoginWithGoogle(ctx context.Context, g model.GoogleIdentity) (model.Account, error)
 	CreateSession(ctx context.Context, accountID int64) (model.Session, error)
@@ -160,10 +160,9 @@ func (s *service) Login(ctx context.Context, email, password string) (model.Acco
 	return a, nil
 }
 
-// SetPassword sets or replaces the password. An existing password must be
-// confirmed with current; accounts without one (Google-only, or dropped on
-// Google link, ADR-0002) can set it freely.
-func (s *service) SetPassword(ctx context.Context, accountID int64, current, next string) error {
+// SetPassword sets or replaces the password of a logged-in account. The
+// session is the proof of identity, so the old password isn't asked for.
+func (s *service) SetPassword(ctx context.Context, accountID int64, next string) error {
 	if err := validatePassword(next); err != nil {
 		return err
 	}
@@ -172,14 +171,12 @@ func (s *service) SetPassword(ctx context.Context, accountID int64, current, nex
 		return err
 	}
 	return s.tx.WithinTx(ctx, func(ctx context.Context) error {
-		old, err := s.repo.PasswordHash(ctx, accountID)
+		_, err := s.repo.PasswordHash(ctx, accountID)
 		switch {
 		case errors.Is(err, model.ErrNotFound):
 			return s.repo.InsertPassword(ctx, accountID, string(hash))
 		case err != nil:
 			return err
-		case bcrypt.CompareHashAndPassword([]byte(old), []byte(current)) != nil:
-			return model.ErrInvalidCredentials
 		}
 		return s.repo.UpdatePassword(ctx, accountID, string(hash))
 	})

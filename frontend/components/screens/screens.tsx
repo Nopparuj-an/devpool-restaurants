@@ -539,7 +539,7 @@ export function AccountScreen({
 }: {
   account: Account;
   onSaveName: (name: string) => Result;
-  onSetPassword: (current: string, next: string) => Result;
+  onSetPassword: (next: string) => Result;
 }) {
   return (
     <>

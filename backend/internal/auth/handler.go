@@ -109,8 +109,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) error {
 
 func (h *Handler) SetPassword(c *gin.Context) error {
 	var in struct {
-		CurrentPassword string `json:"current_password"`
-		NewPassword     string `json:"new_password"`
+		NewPassword string `json:"new_password"`
 	}
 	if err := web.Decode(c, &in); err != nil {
 		return err
@@ -119,7 +118,7 @@ func (h *Handler) SetPassword(c *gin.Context) error {
 	if me.Impersonator != nil {
 		return model.ErrWhileImpersonating
 	}
-	if err := h.svc.SetPassword(c.Request.Context(), me.ID, in.CurrentPassword, in.NewPassword); err != nil {
+	if err := h.svc.SetPassword(c.Request.Context(), me.ID, in.NewPassword); err != nil {
 		return err
 	}
 	c.Status(http.StatusNoContent)

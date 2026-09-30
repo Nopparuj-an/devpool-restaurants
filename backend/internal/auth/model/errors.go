@@ -9,6 +9,7 @@ import (
 var (
 	ErrEmailTaken            = apperr.New(apperr.Conflict, "email_taken", "an account with this email already exists")
 	ErrInvalidCredentials    = apperr.New(apperr.Unauthorized, "invalid_credentials", "wrong email or password")
+	ErrSessionExpired        = apperr.New(apperr.Unauthorized, "session_expired", "your session has expired; log in again")
 	ErrGoogleEmailUnverified = apperr.New(apperr.Forbidden, "google_email_unverified", "your Google account's email is not verified")
 	ErrGoogleConflict        = apperr.New(apperr.Conflict, "google_conflict", "this email is linked to a different Google account")
 	ErrGoogleDisabled        = apperr.New(apperr.NotFound, "google_disabled", "Google login is not configured")
