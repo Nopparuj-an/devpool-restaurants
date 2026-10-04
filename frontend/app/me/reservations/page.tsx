@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { MyBookingsRoute } from "@/components/pages/pages";
+import { MyBookingsRoute } from "@/app/me/reservations/container";
 
 export const metadata: Metadata = { title: "My bookings · Restaurants" };
 

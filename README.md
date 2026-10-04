@@ -87,7 +87,7 @@ make test
 
 ```
 backend/     Go API; booking rules in internal/booking (pure, no I/O)
-frontend/    Next.js app; screens in components/screens, design gallery at /design
+frontend/    Next.js app; each page's container.tsx + screen.tsx beside its page.tsx in app/, design gallery at /design
 deployment/  compose files (infra + app), Garage config, .env, bind-mounted data/
 docs/        wiki: requirements, domain rules, architecture, ADRs, API
 ```

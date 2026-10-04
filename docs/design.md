@@ -27,7 +27,11 @@ frontend/
   components/app/      domain pieces: SiteHeader, RestaurantCard, Gallery, HoursList,
                        BookingPanel, ReviewItem/ReviewForm, ReservationCard, LoadStrip,
                        OwnerTable, RestaurantForm, AuthForm
-  components/screens/  full screens, built from props only
+  app/<route>/         each page's code sits beside its page.tsx: container.tsx (URL +
+                       data, TanStack Query) and screen.tsx (full screen, built from props
+                       only). Folders shared by several routes are _private (app/_auth,
+                       app/me/restaurants/_editor, app/admin/_shared). /design only
+                       consumes the screens; it doesn't shape where they live
   app/design/          gallery, frames, and the mock-data registry
   lib/types.ts         API shapes (mirrors docs/api.md)
   lib/mock.ts          sample data anchored to Thu 1 Oct 2026
@@ -69,6 +73,6 @@ UI text follows the humanizer rules: sentence case everywhere, plain words, no e
 | `/me/account` | AccountScreen | change name; change or set a password |
 | `/login`, `/signup` | AuthScreen | `?next=` (same-site paths only), `?error=` from Google |
 
-Each `app/**/page.tsx` only sets the title and renders a route component from `components/pages/pages.tsx` ([ADR-0013](decisions/0013-client-side-data-loading.md)). The route component reads the URL, loads data in the browser with TanStack Query (`lib/queries.ts` has the query keys and the shared hooks, `lib/api-client.ts` the fetch helpers, through the `/api` rewrite), and renders a screen. While data loads it shows `PageLoading`; a 404 shows `NotFoundView`; other failures show `PageError` with a retry button (`components/app/states.tsx`). After any write, `useRefresh()` invalidates the cache so what's on screen refetches. Pages that need a login send visitors to `/login?next=…` (`useRequireAccount`).
+Each `app/**/page.tsx` only sets the title and renders the `container.tsx` next to it ([ADR-0013](decisions/0013-client-side-data-loading.md)). The route component reads the URL, loads data in the browser with TanStack Query (`lib/queries.ts` has the query keys and the shared hooks, `lib/api-client.ts` the fetch helpers, through the `/api` rewrite), and renders a screen. While data loads it shows `PageLoading`; a 404 shows `NotFoundView`; other failures show `PageError` with a retry button (`components/app/states.tsx`). After any write, `useRefresh()` invalidates the cache so what's on screen refetches. Pages that need a login send visitors to `/login?next=…` (`useRequireAccount`).
 
 **Gotcha, hit twice:** a server component can't read plain values (constants, objects) exported from a `"use client"` module. It receives a client reference instead of the value, with no error. Shared values go in plain modules like `lib/paging.ts` or `app/design/screen-list.ts`.

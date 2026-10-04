@@ -1,4 +1,4 @@
-import { HomeRoute } from "@/components/pages/pages";
+import { HomeRoute } from "@/app/_home/container";
 
 export default function Home() {
   return <HomeRoute />;

@@ -143,3 +143,6 @@ export type AdminRestaurant = {
 
 export type AdminUserDetail = AdminUser & { owned_restaurants: AdminRestaurant[] };
 export type AdminStatus = "" | "active" | "banned";
+
+export type ActionResult = Promise<{ error?: string }>;
+export type Day = { key: string; label: string };

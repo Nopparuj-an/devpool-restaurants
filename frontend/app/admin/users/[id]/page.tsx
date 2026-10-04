@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { AdminUserRoute } from "@/components/pages/pages";
+import { AdminUserRoute } from "@/app/admin/users/[id]/container";
 
 export const metadata: Metadata = { title: "User · Admin" };
 

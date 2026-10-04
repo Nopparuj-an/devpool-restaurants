@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { MyRestaurantsRoute } from "@/components/pages/pages";
+import { MyRestaurantsRoute } from "@/app/me/restaurants/container";
 
 export const metadata: Metadata = { title: "My restaurants · Restaurants" };
 

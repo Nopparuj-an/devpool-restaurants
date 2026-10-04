@@ -3,20 +3,18 @@
 // Every screen with mock data, for /design. Callbacks only simulate latency.
 import { useCallback, useState } from "react";
 
-import {
-  AccountScreen,
-  AdminRestaurantsScreen,
-  AdminUserScreen,
-  AdminUsersScreen,
-  AuthScreen,
-  HomeScreen,
-  MyBookingsScreen,
-  MyRestaurantsScreen,
-  OwnerBookingsScreen,
-  ProfileScreen,
-  RestaurantEditorScreen,
-  RestaurantScreen,
-} from "@/components/screens/screens";
+import { AccountScreen } from "@/app/me/account/screen";
+import { AdminRestaurantsScreen } from "@/app/admin/restaurants/screen";
+import { AdminUserScreen } from "@/app/admin/users/[id]/screen";
+import { AdminUsersScreen } from "@/app/admin/users/screen";
+import { AuthScreen } from "@/app/_auth/screen";
+import { HomeScreen } from "@/app/_home/screen";
+import { MyBookingsScreen } from "@/app/me/reservations/screen";
+import { MyRestaurantsScreen } from "@/app/me/restaurants/screen";
+import { OwnerBookingsScreen } from "@/app/me/restaurants/[id]/bookings/screen";
+import { ProfileScreen } from "@/app/users/[id]/screen";
+import { RestaurantEditorScreen } from "@/app/me/restaurants/_editor/screen";
+import { RestaurantScreen } from "@/app/restaurants/[id]/screen";
 import * as mock from "@/lib/mock";
 import type { ReviewSort, SortKey } from "@/lib/types";
 
