@@ -23,6 +23,43 @@ The interview checks *foundation*: can you explain your own code and why. Keep a
 - Time & timezone: `timestamptz`, `time.LoadLocation`, `time/tzdata`, half-open intervals.
 - SQL & transactions: isolation level we run at (READ COMMITTED) and why the row lock makes it safe; what happens on rollback.
 
+## Timezone details
+- `OpenPeriods` starts one day early because yesterday's shift may run past midnight into today. It builds each shift with `time.Date(..., loc)`, converts to UTC, and merges touching shifts. `Covers` requires the booking `[start, end)` to fit in one merged period.
+- Why merge: a 24h restaurant or back-to-back shifts would otherwise reject a booking that spans two of them.
+- DST is handled by `time.Date` in a `*time.Location`. Thailand has none, but the code is right where it exists.
+- `time/tzdata` is embedded so `LoadLocation` works in slim images without `/usr/share/zoneinfo`.
+- `LoadLocation` accepts `""` and `"Local"`; validation rejects them because they mean nothing to other viewers.
+- Half-open `[start, end)`: a booking ending at 19:00 doesn't clash with one starting at 19:00.
+- The 15-min grid is checked on UTC instants. Every real UTC offset is a multiple of 15 min.
+- Trade-off: a viewer in another timezone sees hours converted to their own time. Accepted, since the audience is all in Asia/Bangkok.
+
+## Booking and rating details
+- Why not a Go mutex: it protects one process only. The lock is in Postgres, so any number of API instances are safe.
+- Why lock the restaurant row: the new reservation doesn't exist yet, so there's nothing else to lock. It serializes bookings per restaurant only.
+- `WithinTx` stores the tx in the `context`; repositories call `Conn(ctx)` and join it. Nested calls join the outer tx. An error from `fn` rolls back, nil commits.
+- `booking` is pure logic with no I/O, and `now` is injected, so rules are unit-tested without a database or a real clock.
+- Bayesian average: `(sum + m·C) / (count + m)`, `C` = mean of all visible reviews, `m` = `bayesianPrior`.
+- Review `Upsert` locks the restaurant first so concurrent writers can't lose a review. Owner can't review their own restaurant; one review per person per restaurant.
+
+## Auth
+- Go-native auth, no Keycloak (ADR-0002). Two identity types: `password` and `google`.
+- Session = Postgres row. Cookie holds a random opaque token; the DB stores only its SHA-256 hash, so a leaked DB gives no working sessions.
+- Cookie flags: `HttpOnly` (XSS can't read it), `Secure` (HTTPS only), `SameSite=Lax` (cross-site POSTs don't carry it, which blocks CSRF).
+- Why not JWT: it can't be revoked before expiry without a server-side list, which is a session table anyway. Sessions make logout, bans, and password changes instant.
+- Middleware: `Session()` loads the account on every request and clears stale cookies. `RequireLogin()` gives 401 (`session_expired` if a dead cookie was sent, else `unauthorized`). `RequireAdmin()` gives 403.
+- Google: authorization-code flow with PKCE, `state`, `nonce` in a 10-minute HttpOnly `google_flow` cookie. ID token verified with go-oidc. Requires `email_verified=true`. `next` limited to relative paths to stop open redirects.
+- Pre-hijack: attacker signs up with the victim's email first, victim later uses Google and gets linked. Fix: first Google link deletes the password identity and all sessions, and marks the email verified. Test: `google_handler_test.go`.
+- Impersonation (ADR-0014): a session row with `admin_id` and a short TTL.
+
+## React Query details
+- `staleTime` 30 s (5 min for `/me`), so going back to a page doesn't always refetch.
+- Retry: not on 4xx, up to twice on network/5xx.
+- A 401 on any read sets the `me` query to `null`, so the app shows logged out when a session expires mid-use.
+- `useRequireAccount` redirects to `/login?next=...`. It only picks the screen; the API refuses the data anyway.
+- Server data lives in the query cache; local UI state (form fields, dialogs) stays in `useState`.
+- Google button is a plain link to the server-side flow. `GET /api/auth/providers` hides it when Google isn't configured.
+- Same-origin `/api` via `proxy.ts` means no CORS and no `SameSite=None`.
+
 ## Scaling (1,000+ users or restaurants)
 - **How does the list scale?** Every list is paged in SQL and returns a total. Search runs in SQL on trigram indexes, not in the browser. Measured with 10,006 restaurants and ~50k reviews: every list endpoint p95 ≤ 12.5 ms (docs/backend.md#scaling).
 - **What breaks first?** "Top rated" scores every row before sorting, and deep offset pages. The fixes are a stored, indexed score column and keyset paging. Both are explained in docs/backend.md.
