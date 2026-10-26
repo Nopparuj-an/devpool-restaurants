@@ -1,8 +1,5 @@
 allowBuilds:
-  unrs-resolver: set this to true or false
-ignoredBuiltDependencies:
-  - sharp
-  - unrs-resolver
+  unrs-resolver: false
 overrides:
   '@types/react': 19.3.0
   '@types/react-dom': 19.3.0
